@@ -244,9 +244,7 @@ def _resolve_mm(candidate: Finding, region: str, full_text: str = "") -> Measure
     return None
 
 
-def _resolve_percent(
-    candidate: Finding, region: str, full_text: str = ""
-) -> Measured | None:
+def _resolve_percent(candidate: Finding, region: str, full_text: str = "") -> Measured | None:
     """Степень сужения в процентах: максимум по тексту протокола.
 
     Ищем по трём источникам по убыванию доверия: заключение → весь
@@ -298,14 +296,12 @@ def _find_occlusion(region: str) -> Measured | None:
             continue
         quote = _clause(region, position)
         if not quote:
-            quote = region[position: position + len(marker)]
+            quote = region[position : position + len(marker)]
         return Measured(value=_OCCLUSION_PERCENT, quote=quote, source="text")
     return None
 
 
-def _resolve_birads(
-    candidate: Finding, region: str, full_text: str = ""
-) -> Measured | None:
+def _resolve_birads(candidate: Finding, region: str, full_text: str = "") -> Measured | None:
     """Категория BI-RADS: из classification находки, затем из текста."""
     if candidate.classification:
         match = _BIRADS_LOOSE_RE.search(candidate.classification)
@@ -352,7 +348,7 @@ def _conclusion_region(text: str) -> str:
         return ""
     upper = text.upper()
     positions = [p for p in (upper.find(m) for m in _CONCLUSION_MARKERS) if p >= 0]
-    return text[min(positions):] if positions else text
+    return text[min(positions) :] if positions else text
 
 
 def _max_measure(region: str, pattern: re.Pattern, near_quote: str) -> Measured | None:

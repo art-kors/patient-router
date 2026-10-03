@@ -81,9 +81,7 @@ class TestPercentThreshold:
         assert "70" in match.detail and "30" in match.detail
 
     def test_процентный_порог_пройден(self):
-        match = decide_stenosis(
-            "ЗАКЛЮЧЕНИЕ\nЗаключение: стеноз правой бедренной артерии до 85%.\n"
-        )
+        match = decide_stenosis("ЗАКЛЮЧЕНИЕ\nЗаключение: стеноз правой бедренной артерии до 85%.\n")
         assert match.fired is True
         assert match.suppression_reason is None
 
@@ -128,9 +126,7 @@ class TestPercentThreshold:
         Иначе настоящий пациент с окклюзией бедренной артерии отсеивается
         порогом 70 % только потому, что врач не написал процент.
         """
-        match = decide_stenosis(
-            "ЗАКЛЮЧЕНИЕ\nЗаключение: Окклюзия левой ЗББА.\n", quote="окклюзия"
-        )
+        match = decide_stenosis("ЗАКЛЮЧЕНИЕ\nЗаключение: Окклюзия левой ЗББА.\n", quote="окклюзия")
         assert match.fired is True
 
     def test_процента_нет_и_окклюзии_нет_порог_не_выполнен(self):

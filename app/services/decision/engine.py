@@ -234,8 +234,7 @@ class DecisionEngine:
             quote=candidate.quote,
             confidence=candidate.confidence,
             applied_rule=rule,
-            detail=outcome.detail
-            or "находка найдена, отрицания нет, порог выполнен",
+            detail=outcome.detail or "находка найдена, отрицания нет, порог выполнен",
         )
 
     @staticmethod
