@@ -36,11 +36,19 @@ class MetricsOut(BaseModel):
 
 
 def labeled_samples() -> list[quality.LabeledSample]:
-    """Отсутствующая или повреждённая разметка означает 503."""
+    """Загрузить разметку и привязать к реальным UUID через индекс."""
     try:
-        return quality.load_labeled_samples(get_settings().labeled_data_dir)
+        samples = quality.load_labeled_samples(get_settings().labeled_data_dir)
     except quality.QualityDataError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    # резолвим demo_* -> UUID через индекс
+    index = quality.load_study_index(get_settings().study_index_path)
+    if index:
+        try:
+            samples = quality.resolve_study_ids(samples, index)
+        except quality.QualityDataError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return samples
 
 
 Samples = Annotated[list[quality.LabeledSample], Depends(labeled_samples)]

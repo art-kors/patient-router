@@ -3,6 +3,7 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import UUID
 
 from app.services.decision.engine import TriggerMatch
 from app.services.decision.matrix import TriggerDef
@@ -209,6 +210,45 @@ def coverage(triggers: list[TriggerDef], samples: list[LabeledSample]) -> dict:
         "uncovered": uncovered,
         "ratio": covered / len(ids) if ids else 0.0,
     }
+
+
+def load_study_index(path: str | Path) -> dict[str, str]:
+    """Загрузить маппинг demo_* study_id -> UUID. Отсутствие файла — пустой маппинг."""
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise QualityDataError(f"{p}: ожидается объект {{demo_id: uuid}}")
+        return {str(k): str(v) for k, v in data.items()}
+    except (OSError, UnicodeError, ValueError, TypeError) as exc:
+        raise QualityDataError(f"Индекс исследований недоступен: {exc}") from exc
+
+
+def resolve_study_ids(samples: list[LabeledSample], index: dict[str, str]) -> list[LabeledSample]:
+    """Заменить demo_* идентификаторы на UUID через индекс. Валидные UUID оставляем как есть."""
+    resolved = []
+    for s in samples:
+        sid = s.study_id
+        try:
+            UUID(sid)  # уже UUID — оставляем
+            resolved.append(s)
+        except ValueError:
+            uuid = index.get(sid)
+            if not uuid:
+                raise QualityDataError(
+                    f"study_id {sid!r} не найден в индексе {list(index)[:3]}..."
+                ) from None
+            resolved.append(
+                LabeledSample(
+                    study_id=uuid,
+                    trigger_id=s.trigger_id,
+                    label=s.label,
+                    split=s.split,
+                )
+            )
+    return resolved
 
 
 class QualityDataError(ValueError):
