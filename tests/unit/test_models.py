@@ -11,6 +11,7 @@
 import pytest
 from sqlalchemy import CheckConstraint, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import configure_mappers
 
 from app.models import (
     AuditLog,
@@ -215,16 +216,29 @@ class TestForeignKeys:
         fk = next(iter(Study.__table__.c["patient_id"].foreign_keys))
         assert fk.ondelete == "CASCADE"
 
-    def test_проверка_ondelete_не_мутирует_метаданные(self):
-        """Тест читает ondelete, но не удаляет FK из общих метаданных.
+    def test_метаданные_не_мутируются_проверкой_ondelete(self):
+        """Проверка ondelete не должна оставлять следов в метаданных.
 
-        Регрессия: .pop() на foreign_keys ломал инициализацию маппингов
-        для всех следующих тестов в том же процессе.
+        Регрессия: .pop() на foreign_keys обнулял коллекцию, после чего
+        любая инициализация маппингов в том же процессе падала с
+        «Could not locate any relevant foreign key columns». Тест вызывает
+        настоящую проверку ondelete, а не её копию, и убеждается, что
+        коллекция уцелела и маппинги по-прежнему собираются.
         """
         column = Study.__table__.c["patient_id"]
-        before = len(list(column.foreign_keys))
-        next(iter(column.foreign_keys))
-        assert len(list(column.foreign_keys)) == before, "тест не должен менять метаданные"
+        before = len(column.foreign_keys)
+        assert before == 1, "у patient_id должен быть ровно один ForeignKey"
+
+        # Вызываем именно тот код, который раньше мутировал метаданные.
+        self.test_каскадное_удаление_от_patient()
+
+        after = len(column.foreign_keys)
+        assert after == before, (
+            f"проверка ondelete изменила число foreign_keys: {before} -> {after}"
+        )
+
+        # Ключевая защита: маппинги всё ещё собираются после проверки.
+        configure_mappers()
 
 
 class TestMetadataIntegrity:
