@@ -202,10 +202,11 @@ class TestNoSideEffects:
     async def test_анализ_ничего_не_меняет(self, analyze):
         """Анализ — чистая функция: повторные вызовы не влияют друг на друга."""
         async with analyze as c:
-            a = (await c.post("/api/v1/analyze", json={"text": TRIGGERED})).json()
-            b = (await c.post("/api/v1/analyze", json={"text": NORMAL})).json()
+            first = (await c.post("/api/v1/analyze", json={"text": TRIGGERED})).json()
+            # между вызовами — другой протокол; он не должен влиять на первый
+            await c.post("/api/v1/analyze", json={"text": NORMAL})
             again = (await c.post("/api/v1/analyze", json={"text": TRIGGERED})).json()
-        assert a == again, "анализ не должен накапливать состояние"
+        assert first == again, "анализ не должен накапливать состояние"
 
 
 class TestOpenApiSchema:
