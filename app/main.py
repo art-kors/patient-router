@@ -7,6 +7,7 @@ import structlog
 from fastapi import FastAPI
 
 from app.api.analysis import router as analysis_router
+from app.api.demo import router as demo_router
 from app.api.health import router as health_router
 from app.api.quality import router as quality_router
 from app.api.routes import router as routes_router
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
         docs_url="/docs",
     )
     app.include_router(health_router, tags=["service"])
+    app.include_router(demo_router)
     app.include_router(analysis_router)
     app.include_router(routes_router)
     app.include_router(quality_router)
