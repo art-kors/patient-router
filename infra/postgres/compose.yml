@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pr-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-patient_router}
+      POSTGRES_USER: ${POSTGRES_USER:-pr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pr_local_dev}
+      # ru_RU не нужен: БД хранит только технические строки
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+      TZ: ${TZ:-Europe/Moscow}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # ↑ персистентность: переживает пересоздание контейнера
+      - ./init:/docker-entrypoint-initdb.d:ro
+      # ↑ схема + сиды применяются один раз при первом старте
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pr} -d ${POSTGRES_DB:-patient_router}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # ────────────────────────────────────────────────────────────
+  # Одноразовый сервис: применить init-скрипты к уже существующей БД
+  # Нужен, когда volume уже инициализирован, а скрипты изменились:
+  #   docker compose run --rm db-init
+  # ────────────────────────────────────────────────────────────
+  db-init:
+    image: postgres:16-alpine
+    container_name: pr-db-init
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-pr_local_dev}
+    volumes:
+      - ./init:/init:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        for f in /init/*.sql; do
+          echo "→ applying $$f"
+          psql -h db -U "${POSTGRES_USER:-pr}" -d "${POSTGRES_DB:-patient_router}" \
+               -v ON_ERROR_STOP=1 -f "$$f"
+        done
+        echo "✓ init scripts applied"
+    profiles: ["tools"]
+    restart: "no"
+
+volumes:
+  pgdata:
+    name: pr_pgdata

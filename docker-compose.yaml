@@ -1,0 +1,89 @@
+# ────────────────────────────────────────────────────────────
+# patient-router · БД + приложение
+#
+#   docker compose up --build              # продакшн-подобный запуск
+#   docker compose --profile dev up dev    # с hot reload
+#
+# БД:    localhost:5433 · приложение: localhost:8000 · docs: /docs
+# ────────────────────────────────────────────────────────────
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pr-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-patient_router}
+      POSTGRES_USER: ${POSTGRES_USER:-pr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pr_local_dev}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+      TZ: ${TZ:-Europe/Moscow}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # init-скрипты НЕ подключены: БД поднимается пустой.
+      # Схему накатываем Alembic-миграциями.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pr} -d ${POSTGRES_DB:-patient_router}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pr-app
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-patient_router}
+      POSTGRES_USER: ${POSTGRES_USER:-pr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pr_local_dev}
+      ENVIRONMENT: ${ENVIRONMENT:-prod}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      USE_MODEL_CLOCK: ${USE_MODEL_CLOCK:-false}
+      TZ: ${TZ:-Europe/Moscow}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      db:
+        # ждём не просто старта, а успешного pg_isready
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── dev: то же приложение, но с hot reload ───────────────
+  dev:
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: pr-app-dev
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-patient_router}
+      POSTGRES_USER: ${POSTGRES_USER:-pr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pr_local_dev}
+      ENVIRONMENT: dev
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      USE_MODEL_CLOCK: ${USE_MODEL_CLOCK:-true}
+      TZ: ${TZ:-Europe/Moscow}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      # исходники монтируются, зависимости живут в образе
+      - ./app:/app/app
+      - ./infra:/app/infra:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    name: pr_pgdata

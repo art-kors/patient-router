@@ -1,0 +1,33 @@
+# secrets
+.env
+*.env
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# данные хакатона: протоколы и разметка НЕ публикуются (требование кейса)
+data/raw/
+data/protocols/
+data/labeled/
+*.docx
+*.pdf
+!docs/**/*.pdf
+
+# tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.sqlite
+*.sqlite3
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
