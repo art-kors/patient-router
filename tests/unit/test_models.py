@@ -212,7 +212,7 @@ class TestForeignKeys:
 
     def test_каскадное_удаление_от_patient(self):
         """Пациент удалён → каскадом уходят его исследования и маршруты."""
-        fk = Study.__table__.c["patient_id"].foreign_keys.pop()
+        fk = next(iter(Study.__table__.c["patient_id"].foreign_keys))
         assert fk.ondelete == "CASCADE"
 
 
