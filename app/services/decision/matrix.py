@@ -21,6 +21,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app.services.decision.thresholds import supports_threshold
 from app.settings import get_settings
 
 # Путь по умолчанию: config/routing_matrix.json рядом с приложением.
@@ -155,6 +156,14 @@ def validate(triggers: list[TriggerDef]) -> list[str]:
                 f"{trigger.trigger_id}: приоритет {trigger.priority}, но пороги не заданы — "
                 "возможны ложные срабатывания на нормах"
             )
+        # Порог, который движок не умеет проверять, — это правило без
+        # проверки. Именно так появился баг с min_stenosis_percent.
+        for key in sorted(trigger.thresholds):
+            if not supports_threshold(key):
+                warnings.append(
+                    f"{trigger.trigger_id}: порог «{key}» не поддерживается движком — "
+                    "триггер никогда не сработает, добавьте поддержку в thresholds.py"
+                )
         if trigger.emergency_flag and trigger.priority != 1:
             warnings.append(
                 f"{trigger.trigger_id}: emergency_flag=true, но priority={trigger.priority} — "

@@ -31,6 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from app.services.decision.matrix import TriggerDef, load_triggers
+from app.services.decision.thresholds import evaluate_thresholds
 from app.services.extraction.base import Finding
 
 
@@ -104,7 +105,9 @@ class DecisionEngine:
       1. Соответствие типу исследования — иначе ищем не там.
       2. Наличие синонима в тексте.
       3. Отрицательный контекст — гасим находку.
-      4. Порог размера/классификации.
+      4. Числовые пороги из матрицы — ВСЕ, а не один захардкоженный.
+         Логика проверки живёт в thresholds.py: она общая для любого
+         числового порога, добавленного заказчиком в routing_matrix.json.
       5. Флаг экстренности.
     """
 
@@ -134,7 +137,7 @@ class DecisionEngine:
         haystack = conclusion_text.lower()
 
         for trigger in self._triggers:
-            match = self._evaluate(trigger, findings, study_type, haystack)
+            match = self._evaluate(trigger, findings, study_type, haystack, conclusion_text)
             result.matches.append(match)
             if match.fired:
                 result.fired.append(match)
@@ -151,8 +154,18 @@ class DecisionEngine:
         findings: list[Finding],
         study_type: str | None,
         haystack: str,
+        conclusion_text: str = "",
     ) -> TriggerMatch:
-        """Проверить один триггер. Возвращает и срабатывание, и подавление."""
+        """Проверить один триггер. Возвращает и срабатывание, и подавление.
+
+        Args:
+            haystack: текст заключения в нижнем регистре — для поиска
+                отрицаний (регистронезависимо).
+            conclusion_text: тот же текст в исходном регистре — для поиска
+                значений порогов. Нужен именно в исходном виде: цитата в
+                отказе по порогу обязана дословно встречаться в протоколе,
+                а lower() это разрушает.
+        """
         rule = f"{trigger.trigger_id}@v{trigger.version}"
 
         # 1. Тип исследования: ищем полип эндометрия в УЗИ почек — бессмысленно.
@@ -198,32 +211,21 @@ class DecisionEngine:
                 ),
             )
 
-        # 4. Порог размера.
-        min_size = trigger.threshold_value("min_size_mm")
-        if min_size is not None:
-            if candidate.size_mm is None:
-                # Размер не указан: считаем порог невыполненным, но явно.
-                return TriggerMatch(
-                    trigger=trigger,
-                    fired=False,
-                    suppressed=True,
-                    suppression_reason="threshold_not_met",
-                    quote=candidate.quote,
-                    confidence=candidate.confidence,
-                    applied_rule=rule,
-                    detail=f"требуется размер ≥ {min_size} мм, размер в тексте не указан",
-                )
-            if candidate.size_mm < min_size:
-                return TriggerMatch(
-                    trigger=trigger,
-                    fired=False,
-                    suppressed=True,
-                    suppression_reason="threshold_not_met",
-                    quote=candidate.quote,
-                    confidence=candidate.confidence,
-                    applied_rule=rule,
-                    detail=f"порог {min_size} мм, найдено {candidate.size_mm} мм",
-                )
+        # 4. Пороги. Проверяются ВСЕ числовые пороги триггера из матрицы,
+        #    а не только min_size_mm: неподдержанный или невыполненный
+        #    порог гасит срабатывание и объясняет врачу почему.
+        outcome = evaluate_thresholds(trigger, candidate, conclusion_text)
+        if not outcome.passed:
+            return TriggerMatch(
+                trigger=trigger,
+                fired=False,
+                suppressed=True,
+                suppression_reason="threshold_not_met",
+                quote=outcome.quote or candidate.quote,
+                confidence=candidate.confidence,
+                applied_rule=rule,
+                detail=outcome.detail,
+            )
 
         # Всё сошлось — триггер сработал.
         return TriggerMatch(
@@ -232,7 +234,7 @@ class DecisionEngine:
             quote=candidate.quote,
             confidence=candidate.confidence,
             applied_rule=rule,
-            detail="находка найдена, отрицания нет, порог выполнен",
+            detail=outcome.detail or "находка найдена, отрицания нет, порог выполнен",
         )
 
     @staticmethod
