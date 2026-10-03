@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from app.api.analysis import router as analysis_router
 from app.api.health import router as health_router
+from app.api.routes import router as routes_router
 from app.settings import get_settings
 
 settings = get_settings()
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router, tags=["service"])
     app.include_router(analysis_router)
+    app.include_router(routes_router)
     return app
 
 
