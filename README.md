@@ -33,16 +33,41 @@ open http://localhost:8000/docs
 
 Приложение: <http://localhost:8000> · OpenAPI: <http://localhost:8000/docs> · БД: `localhost:5433`.
 
-> **БД поднимается пустой.** Миграции пока не настроены: ORM-модели описаны в
-> `app/models.py`, но таблицы в БД ещё не создаются. Alembic будет добавлен на
-> следующем шаге.
+## Миграции
+
+DSN берётся из `app/settings.py`, поэтому `alembic` и приложение всегда ходят
+в одну и ту же БД.
+
+```bash
+uv run alembic upgrade head          # применить миграции
+uv run alembic downgrade base        # откатить всё
+uv run alembic revision --autogenerate -m "описание"   # новая миграция
+uv run alembic check                 # есть ли расхождения с моделями
+uv run alembic current               # текущая ревизия
+```
+
+Новые миграции автоматически форматируются `ruff` (хуки в `alembic.ini`).
+
+> `docker compose up` **не** применяет миграции: делайте `alembic upgrade head`
+> отдельно. Это осознанно — на боевой среде миграции накатываются явно, а не
+> при старте контейнера.
 
 ## Локальная разработка без Docker
 
 ```bash
-uv sync                        # зависимости из uv.lock
-docker compose up -d db        # только БД (пустая)
+uv sync                              # зависимости из uv.lock
+docker compose up -d db              # только БД
+uv run alembic upgrade head          # создать схему
 uv run uvicorn app.main:app --reload
+```
+
+Локально можно ходить в существующий PostgreSQL через unix-сокет, если указать
+путь вместо хоста — пароль не потребуется:
+
+```bash
+POSTGRES_HOST=/run/postgresql
+POSTGRES_DB=<база>
+POSTGRES_USER=<роль>
 ```
 
 ## Команды
@@ -64,7 +89,9 @@ app/
 ├── db.py             # async-движок SQLAlchemy и фабрика сессий
 ├── clock.py          # Clock: системное и модельное время
 └── models.py         # ORM-модели (20 сущностей)
-infra/postgres/       # схема БД и сиды (пока не подключены к compose)
+alembic/              # миграции (async, DSN из app/settings)
+alembic.ini           # конфигурация; URL переопределяется в alembic/env.py
+infra/postgres/       # эталонная схема и сиды (для справки и ручных проверок)
 Dockerfile            # образ приложения (uv.lock, --frozen)
 Dockerfile.dev        # dev-образ с hot reload
 docker-compose.yaml   # db + app (+ dev в профиле)

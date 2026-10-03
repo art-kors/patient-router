@@ -21,8 +21,10 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
-# затем код приложения (пакет собирается как editable)
+# затем код приложения + миграции (пакет собирается как editable)
 COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
 COPY README.md ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
@@ -49,6 +51,8 @@ WORKDIR /app
 # venv целиком из сборочного слоя — нативные библиотеки совпадают
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 COPY --from=builder --chown=appuser:appuser /app/app /app/app
+COPY --from=builder --chown=appuser:appuser /app/alembic /app/alembic
+COPY --from=builder --chown=appuser:appuser /app/alembic.ini /app/alembic.ini
 
 USER appuser
 

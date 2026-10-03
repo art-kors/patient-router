@@ -12,7 +12,6 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
     Index,
     Integer,
@@ -23,6 +22,9 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy import (
+    Enum as SAEnum,
+)
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -32,7 +34,17 @@ class Base(DeclarativeBase):
 
 
 def _uuid() -> Mapped[UUID]:
-    return mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    """UUID-PK с серверным DEFAULT.
+
+    Python-side default работает только через ORM; серверный нужен,
+    чтобы сиды и прямые SQL-вставки тоже получали id.
+    """
+    return mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
 
 
 # ============================================================
@@ -46,7 +58,9 @@ class Specialty(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    is_surgical: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_surgical: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
 
     triggers: Mapped[list[TriggerDef]] = relationship(back_populates="specialty")
 
@@ -83,9 +97,7 @@ class Patient(Base):
 
     id: Mapped[UUID] = _uuid()
     external_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    anonymized_hash: Mapped[str] = mapped_column(
-        String(128), unique=True, nullable=False
-    )
+    anonymized_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     age: Mapped[int | None] = mapped_column(Integer)
     sex: Mapped[str | None] = mapped_column(String(1))
     created_at: Mapped[datetime] = mapped_column(
@@ -100,7 +112,7 @@ class Patient(Base):
     )
 
 
-class StudyStatus(str, enum.Enum):
+class StudyStatus(enum.StrEnum):
     RECEIVED = "received"
     EXTRACTED = "extracted"
     PROCESSED = "processed"
@@ -123,7 +135,10 @@ class Study(Base):
     document_ref: Mapped[str | None] = mapped_column(Text)
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(
-        String(32), default=StudyStatus.RECEIVED.value, nullable=False
+        String(32),
+        default=StudyStatus.RECEIVED.value,
+        server_default=text("'received'"),
+        nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -148,9 +163,15 @@ class Protocol(Base):
     )
     signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     doctor_id: Mapped[str | None] = mapped_column(String(64))
-    facts: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    is_corrected: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    is_cancelled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    facts: Mapped[dict] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::jsonb"), nullable=False
+    )
+    is_corrected: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    is_cancelled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -183,7 +204,7 @@ class Finding(Base):
     char_end: Mapped[int | None] = mapped_column(Integer)
     confidence: Mapped[float | None] = mapped_column(Numeric(4, 3))
     in_negative_ctx: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False
+        Boolean, default=False, server_default=text("false"), nullable=False
     )
     source_section: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(
@@ -217,18 +238,34 @@ class TriggerDef(Base):
     trigger_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     source_study: Mapped[str] = mapped_column(String(255), nullable=False)
-    synonyms: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
-    negative_contexts: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
-    thresholds: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    synonyms: Mapped[list] = mapped_column(
+        JSON, default=list, server_default=text("'[]'::jsonb"), nullable=False
+    )
+    negative_contexts: Mapped[list] = mapped_column(
+        JSON, default=list, server_default=text("'[]'::jsonb"), nullable=False
+    )
+    thresholds: Mapped[dict] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::jsonb"), nullable=False
+    )
     specialty_id: Mapped[int | None] = mapped_column(ForeignKey("specialty.id"))
     potential_route: Mapped[str | None] = mapped_column(Text)
-    target_sla_days: Mapped[int] = mapped_column(Integer, default=14, nullable=False)
+    target_sla_days: Mapped[int] = mapped_column(
+        Integer, default=14, server_default=text("14"), nullable=False
+    )
     department: Mapped[str | None] = mapped_column(String(255))
-    priority: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    priority: Mapped[int] = mapped_column(
+        Integer, default=3, server_default=text("3"), nullable=False
+    )
     # ★ экстренная находка: авто-маршрут блокируется на уровне кода
-    emergency_flag: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    emergency_flag: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=text("1"), nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -247,9 +284,7 @@ class TriggerMatch(Base):
     __tablename__ = "trigger_match"
     __table_args__ = (
         # ★ защита от дублей при исправлении протокола
-        UniqueConstraint(
-            "protocol_id", "trigger_def_id", name="uq_trigger_match_protocol_trigger"
-        ),
+        UniqueConstraint("protocol_id", "trigger_def_id", name="uq_trigger_match_protocol_trigger"),
         Index("idx_trigger_match_protocol", "protocol_id"),
         Index("idx_trigger_match_fired", "fired", postgresql_where=text("fired")),
     )
@@ -258,15 +293,15 @@ class TriggerMatch(Base):
     protocol_id: Mapped[UUID] = mapped_column(
         ForeignKey("protocol.id", ondelete="CASCADE"), nullable=False
     )
-    trigger_def_id: Mapped[int] = mapped_column(
-        ForeignKey("trigger_def.id"), nullable=False
+    trigger_def_id: Mapped[int] = mapped_column(ForeignKey("trigger_def.id"), nullable=False)
+    finding_id: Mapped[UUID | None] = mapped_column(ForeignKey("finding.id", ondelete="SET NULL"))
+    fired: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
     )
-    finding_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("finding.id", ondelete="SET NULL")
-    )
-    fired: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # ★ подавленный триггер объясняется: требование кейса «почему не сработало»
-    suppressed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    suppressed: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
     suppression_reason: Mapped[str | None] = mapped_column(
         String(32),
         CheckConstraint(
@@ -277,7 +312,9 @@ class TriggerMatch(Base):
     )
     applied_rule: Mapped[str] = mapped_column(String(128), nullable=False)
     confidence: Mapped[float | None] = mapped_column(Numeric(4, 3))
-    explanation: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    explanation: Mapped[dict] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::jsonb"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -309,19 +346,19 @@ class MisEvent(Base):
     id: Mapped[UUID] = _uuid()
     event_id: Mapped[str] = mapped_column(String(128), nullable=False)
     event_type: Mapped[str] = mapped_column(String(64), nullable=False)
-    occurred_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    patient_id: Mapped[UUID | None] = mapped_column(ForeignKey("patient.id", ondelete="SET NULL"))
+    study_id: Mapped[UUID | None] = mapped_column(ForeignKey("study.id", ondelete="SET NULL"))
+    payload: Mapped[dict] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::jsonb"), nullable=False
     )
-    patient_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("patient.id", ondelete="SET NULL")
+    schema_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=text("1"), nullable=False
     )
-    study_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("study.id", ondelete="SET NULL")
-    )
-    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    schema_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    is_duplicate: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_duplicate: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -332,7 +369,7 @@ class MisEvent(Base):
 # ============================================================
 
 
-class RouteStatus(str, enum.Enum):
+class RouteStatus(enum.StrEnum):
     CREATED = "created"
     NOTIFIED = "notified"
     AWAITING_BOOKING = "awaiting_booking"
@@ -354,7 +391,7 @@ class RouteStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class CloseReason(str, enum.Enum):
+class CloseReason(enum.StrEnum):
     NOT_REALIZED = "not_realized"
     PATIENT_REFUSED = "patient_refused"
     NO_OPERATION = "no_operation"
@@ -363,7 +400,7 @@ class CloseReason(str, enum.Enum):
     OTHER = "other"
 
 
-class Tactics(str, enum.Enum):
+class Tactics(enum.StrEnum):
     SURGERY_INDICATED = "surgery_indicated"
     ADDITIONAL_EXAM = "additional_exam"
     OBSERVATION = "observation"
@@ -372,7 +409,7 @@ class Tactics(str, enum.Enum):
     REFER_OTHER_SPECIALTY = "refer_other_specialty"
 
 
-class TimerType(str, enum.Enum):
+class TimerType(enum.StrEnum):
     NOTIFY_INITIAL = "notify_initial"
     NOTIFY_REMINDER = "notify_reminder"
     CREATE_TASK = "create_task"
@@ -400,8 +437,9 @@ class Route(Base):
     specialty_id: Mapped[int | None] = mapped_column(ForeignKey("specialty.id"))
     clinic_id: Mapped[int | None] = mapped_column(ForeignKey("clinic.id"))
     status: Mapped[str] = mapped_column(
-        SAEnum(RouteStatus, name="route_status", native_enum=False, length=32),
+        SAEnum(RouteStatus, name="route_status", values_callable=lambda e: [m.value for m in e]),
         default=RouteStatus.CREATED.value,
+        server_default=text("'created'"),
         nullable=False,
     )
     target_date: Mapped[date | None] = mapped_column(Date)
@@ -410,7 +448,7 @@ class Route(Base):
     )
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     close_reason: Mapped[str | None] = mapped_column(
-        SAEnum(CloseReason, name="close_reason", native_enum=False, length=32)
+        SAEnum(CloseReason, name="close_reason", values_callable=lambda e: [m.value for m in e])
     )
 
     patient: Mapped[Patient] = relationship(back_populates="routes")
@@ -419,12 +457,8 @@ class Route(Base):
     steps: Mapped[list[RouteStep]] = relationship(
         back_populates="route", cascade="all, delete-orphan"
     )
-    timers: Mapped[list[Timer]] = relationship(
-        back_populates="route", cascade="all, delete-orphan"
-    )
-    tasks: Mapped[list[Task]] = relationship(
-        back_populates="route", cascade="all, delete-orphan"
-    )
+    timers: Mapped[list[Timer]] = relationship(back_populates="route", cascade="all, delete-orphan")
+    tasks: Mapped[list[Task]] = relationship(back_populates="route", cascade="all, delete-orphan")
     notifications: Mapped[list[Notification]] = relationship(
         back_populates="route", cascade="all, delete-orphan"
     )
@@ -467,9 +501,7 @@ class Timer(Base):
     __tablename__ = "timer"
     __table_args__ = (
         # ★ защита от двойного срабатывания и дублей при пересоздании
-        UniqueConstraint(
-            "route_id", "timer_type", "due_at", name="uq_timer_route_type_due"
-        ),
+        UniqueConstraint("route_id", "timer_type", "due_at", name="uq_timer_route_type_due"),
         Index("idx_timer_due", "due_at", postgresql_where=text("NOT fired")),
         Index("idx_timer_route", "route_id"),
     )
@@ -479,11 +511,13 @@ class Timer(Base):
         ForeignKey("route.id", ondelete="CASCADE"), nullable=False
     )
     timer_type: Mapped[str] = mapped_column(
-        SAEnum(TimerType, name="timer_type", native_enum=False, length=32),
+        SAEnum(TimerType, name="timer_type", values_callable=lambda e: [m.value for m in e]),
         nullable=False,
     )
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    fired: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    fired: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
     fired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     channel: Mapped[str | None] = mapped_column(String(32))
 
@@ -506,9 +540,13 @@ class Task(Base):
     )
     task_type: Mapped[str] = mapped_column(String(64), nullable=False)
     assignee_role: Mapped[str] = mapped_column(String(64), nullable=False)
-    priority: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    priority: Mapped[int] = mapped_column(
+        Integer, default=3, server_default=text("3"), nullable=False
+    )
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    status: Mapped[str] = mapped_column(String(32), default="open", nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32), default="open", server_default=text("'open'"), nullable=False
+    )
     result: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -521,9 +559,7 @@ class Task(Base):
 class Notification(Base):
     __tablename__ = "notification"
     __table_args__ = (
-        CheckConstraint(
-            "channel IN ('lk','push','sms','task')", name="notification_channel_check"
-        ),
+        CheckConstraint("channel IN ('lk','push','sms','task')", name="notification_channel_check"),
         CheckConstraint(
             "delivery_status IN ('sent','delivered','failed','suppressed')",
             name="notification_delivery_status_check",
@@ -535,16 +571,18 @@ class Notification(Base):
     route_id: Mapped[UUID] = mapped_column(
         ForeignKey("route.id", ondelete="CASCADE"), nullable=False
     )
-    channel: Mapped[str] = mapped_column(String(32), nullable=False)
+    channel: Mapped[str] = mapped_column(String(32), server_default=text("'lk'"), nullable=False)
     template_code: Mapped[str] = mapped_column(String(64), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     sent_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     delivery_status: Mapped[str] = mapped_column(
-        String(32), default="sent", nullable=False
+        String(32), default="sent", server_default=text("'sent'"), nullable=False
     )
-    is_emergency: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_emergency: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
 
     route: Mapped[Route] = relationship(back_populates="notifications")
 
@@ -572,9 +610,11 @@ class Appointment(Base):
     clinic_id: Mapped[int | None] = mapped_column(ForeignKey("clinic.id"))
     slot_ref: Mapped[str | None] = mapped_column(String(64))
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    is_online: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_online: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
     visit_status: Mapped[str] = mapped_column(
-        String(32), default="booked", nullable=False
+        String(32), default="booked", server_default=text("'booked'"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -600,7 +640,9 @@ class Hospitalization(Base):
     scheduled_date: Mapped[date | None] = mapped_column(Date)
     actual_date: Mapped[date | None] = mapped_column(Date)
     ward: Mapped[str | None] = mapped_column(String(64))
-    status: Mapped[str] = mapped_column(String(32), default="referred", nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32), default="referred", server_default=text("'referred'"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -621,9 +663,7 @@ class Surgery(Base):
     )
     # операция подтягивается из фактически оказанных услуг
     service_code: Mapped[str] = mapped_column(String(64), nullable=False)
-    performed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    performed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     hospitalization: Mapped[Hospitalization] = relationship(back_populates="surgeries")
 
@@ -643,7 +683,9 @@ class Followup(Base):
         ForeignKey("route.id", ondelete="CASCADE"), nullable=False
     )
     target_date: Mapped[date] = mapped_column(Date, nullable=False)
-    status: Mapped[str] = mapped_column(String(32), default="scheduled", nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32), default="scheduled", server_default=text("'scheduled'"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -661,16 +703,14 @@ class AuditLog(Base):
     __table_args__ = (Index("idx_audit_route_time", "route_id", "created_at"),)
 
     id: Mapped[UUID] = _uuid()
-    route_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("route.id", ondelete="CASCADE")
-    )
-    study_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("study.id", ondelete="CASCADE")
-    )
+    route_id: Mapped[UUID | None] = mapped_column(ForeignKey("route.id", ondelete="CASCADE"))
+    study_id: Mapped[UUID | None] = mapped_column(ForeignKey("study.id", ondelete="CASCADE"))
     actor: Mapped[str] = mapped_column(String(64), nullable=False)
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     basis: Mapped[str | None] = mapped_column(Text)
-    details: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    details: Mapped[dict] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'::jsonb"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

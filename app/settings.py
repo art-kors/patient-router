@@ -28,15 +28,35 @@ class Settings(BaseSettings):
     timezone: str = "Europe/Moscow"
     use_model_clock: bool = False
 
+    # --- миграции ---
+    # пусто = использовать схему из DSN (в docker это public).
+    # Нужно для локальной проверки миграций в отдельной схеме.
+    alembic_target_schema: str = ""
+
     # --- лимиты ---
     max_notifications_per_route: int = 8
     notification_throttle_seconds: int = 3600
 
     @property
     def database_url(self) -> str:
-        """DSN для asyncpg."""
+        """DSN для asyncpg.
+
+        Если postgres_host — путь к сокету (начинается с /), подключаемся
+        через unix-сокет: пароль не нужен, работает peer-авторизация.
+        """
+        user = self.postgres_user
+        if self.postgres_password:
+            user = f"{user}:{self.postgres_password}"
+
+        if self.postgres_host.startswith("/"):
+            # unix-сокет: host передаётся параметром, а не частью authority
+            return (
+                f"postgresql+asyncpg://{user}@/{self.postgres_db}"
+                f"?host={self.postgres_host}"
+            )
+
         return (
-            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
+            f"postgresql+asyncpg://{user}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 

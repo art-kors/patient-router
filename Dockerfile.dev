@@ -17,13 +17,19 @@ ENV UV_COMPILE_BYTECODE=1 \
     PATH="/app/.venv/bin:$PATH"
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tzdata curl watchproc \
+ && apt-get install -y --no-install-recommends tzdata curl \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# манифесты → слой с зависимостями (включая dev-группу)
+# манифесты → слой с зависимостями (включая dev-группу).
+# Копируем манифесты первыми, но пакет app нужен уже на этом шаге —
+# иначе uv не сможет собрать его (в отличие от --no-install-project).
 COPY pyproject.toml uv.lock ./
+COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
+COPY README.md ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
 

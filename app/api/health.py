@@ -32,9 +32,7 @@ async def ready(
     """Готовность: приложение живо И БД отвечает."""
     try:
         await session.execute(text("SELECT 1"))
-        db_ok = True
     except Exception as exc:
-        db_ok = False
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {"status": "not_ready", "database": "down", "error": str(exc)[:200]}
 
