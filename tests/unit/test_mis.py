@@ -32,7 +32,7 @@ from app.services.decision.matrix import TriggerDef
 from app.services.extraction.base import ExtractionResult
 from app.services.extraction.base import Finding as ExtractedFinding
 from app.services.mis import EVENT_TYPES, MisEventHandler
-from app.services.routing import RoutingService
+from app.services.routing import RoutingService, RoutingTransitionError
 from app.services.timers import TimerEngine
 
 
@@ -214,10 +214,28 @@ async def test_emergency_не_создаёт_маршрут(session, monkeypatch
 async def test_невозможный_переход_не_роняет_обработку(session, model_clock):
     route = Route(id=uuid4(), status=RouteStatus.CREATED)
     bind_session(session, {Route: route})
-    result = await MisEventHandler().handle(session, event("VisitNoShow", route))
+    handler = MisEventHandler()
+    # Боевой автомат отклоняет переход по статусу, а не по отсутствию маршрута:
+    # запоминаем исключение, иначе «маршрут не найден» сошёл бы за невозможный переход.
+    refusals = []
+    transition = handler.routing.transition
+
+    async def spy(session_, route_id, to_status, actor, basis, **fields):
+        try:
+            return await transition(session_, route_id, to_status, actor, basis, **fields)
+        except RoutingTransitionError as exc:
+            refusals.append(str(exc))
+            raise
+
+    handler.routing.transition = spy
+    result = await handler.handle(session, event("VisitNoShow", route))
     assert result["status"] == "processed"
     assert "transition_rejected: created→no_show" in result["actions"]
     assert route.status == RouteStatus.CREATED
+    assert refusals, "переход должен быть отклонён боевым автоматом, а не пропущен"
+    assert "невозможен" in refusals[0], (
+        f"отказ должен касаться матрицы переходов, а не поиска маршрута: {refusals[0]}"
+    )
     rows = [call.args[0] for call in session.add.call_args_list]
     assert next(row for row in rows if isinstance(row, MisEvent)).processed_at == model_clock.now()
     assert next(row for row in rows if isinstance(row, AuditLog)).details == result
