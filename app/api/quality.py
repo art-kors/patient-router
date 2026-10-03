@@ -46,6 +46,26 @@ def labeled_samples() -> list[quality.LabeledSample]:
 Samples = Annotated[list[quality.LabeledSample], Depends(labeled_samples)]
 
 
+def _scoped(metric, *args, **kwargs):
+    """Ошибка области — это 503, а не 500: данные не дают честной метрики.
+
+    Так эндпоинт отвечает «не смогли посчитать честно», а не отдаёт нули,
+    которые читаются как «движок ничего не находит».
+    """
+    try:
+        return metric(*args, **kwargs)
+    except quality.QualityScopeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+def _confusion(predictions, labels) -> dict:
+    return _scoped(quality.confusion, predictions, labels)
+
+
+def _errors(predictions, labels, limit) -> list[dict]:
+    return _scoped(quality.errors, predictions, labels, limit=limit)
+
+
 async def _evaluate(samples, split):
     """Прогнать реальные протоколы по текущему декодеру и матрице."""
     from app.db import SessionFactory
@@ -83,16 +103,22 @@ async def _evaluate(samples, split):
             study_type=extraction.meta.study_type,
             conclusion_text=extraction.conclusion_text,
         )
-        results.append((decision.matches, labels))
+        # Обёртка фиксирует исследование: метрика считается строго по этому
+        # study_id, и предсказания не могут молча уехать в чужую оценку.
+        results.append((quality.StudyPredictions(study_id, tuple(decision.matches)), labels))
     return results
 
 
 @router.get("/metrics", response_model=MetricsOut)
 async def metrics(samples: Samples, split: Split = "all") -> MetricsOut:
-    """Метрики по всем исследованиям выбранной выборки."""
+    """Метрики по всем исследованиям выбранной выборки.
+
+    Считаются по одному исследованию за раз, затем складываются: одна оценка,
+    смешанная из разных протоколов, дала бы неправдоподобные числа.
+    """
     counts = dict.fromkeys(("tp", "fp", "fn", "tn"), 0)
     for predictions, labels in await _evaluate(samples, split):
-        for key, value in quality.confusion(predictions, labels).items():
+        for key, value in _confusion(predictions, labels).items():
             counts[key] += value
     result = quality.QualityMetrics(**counts)
     return MetricsOut(
@@ -115,7 +141,7 @@ async def errors(
     """Расхождения с цитатами, ограниченные общим лимитом."""
     result = []
     for predictions, labels in await _evaluate(samples, split):
-        result.extend(quality.errors(predictions, labels, limit=limit - len(result)))
+        result.extend(_errors(predictions, labels, limit - len(result)))
     return result
 
 

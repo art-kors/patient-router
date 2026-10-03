@@ -10,6 +10,8 @@ from app.services.quality import (
     LabeledSample,
     QualityDataError,
     QualityMetrics,
+    QualityScopeError,
+    StudyPredictions,
     compute_metrics,
     confusion,
     coverage,
@@ -30,6 +32,10 @@ def prediction(fired=True, trigger_id="polyp"):
     return TriggerMatch(
         trigger(trigger_id), fired, quote="Обнаружен полип", applied_rule=f"{trigger_id}@v1"
     )
+
+
+def study(fired=True, trigger_id="polyp", study_id="study-1"):
+    return StudyPredictions(study_id, (prediction(fired, trigger_id),))
 
 
 def test_recall_и_precision_на_идеальных_данных():
@@ -122,9 +128,12 @@ async def test_api_суммирует_исследования_без_смеши
     from app.main import app
 
     async def evaluate(samples, split):
-        return [([prediction()], [sample()]), ([prediction(False)], [sample(False)])]
+        return [
+            (study(True, study_id="study-1"), [sample(True, study_id="study-1")]),
+            (study(False, study_id="study-2"), [sample(False, study_id="study-2")]),
+        ]
 
-    app.dependency_overrides[api.labeled_samples] = lambda: [sample()]
+    app.dependency_overrides[api.labeled_samples] = lambda: [sample(study_id="study-1")]
     monkeypatch.setattr(api, "_evaluate", evaluate)
     try:
         response = await client.get("/api/v1/quality/metrics?split=gold")
@@ -143,3 +152,96 @@ async def test_api_суммирует_исследования_без_смеши
         )
     finally:
         app.dependency_overrides.pop(api.labeled_samples)
+
+
+async def test_api_ошибка_области_даёт_503_а_не_мусорные_нули(client, monkeypatch):
+    """Предсказания не того исследования не превращаются в «ничего не нашло»."""
+    from app.api import quality as api
+    from app.main import app
+
+    async def evaluate(samples, split):
+        # study-1 размечен, а движок прогоняли по study-2 — тихая подмена.
+        return [(study(True, study_id="study-2"), [sample(True, study_id="study-1")])]
+
+    app.dependency_overrides[api.labeled_samples] = lambda: [sample(study_id="study-1")]
+    monkeypatch.setattr(api, "_evaluate", evaluate)
+    try:
+        for endpoint in ("metrics", "confusion", "errors"):
+            response = await client.get(f"/api/v1/quality/{endpoint}")
+            assert response.status_code == 503
+            assert "study-2" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.pop(api.labeled_samples)
+
+
+def test_сопоставление_по_паре_исследование_и_триггер():
+    """Один и тот же триггер у разных исследований не склеивается."""
+    assert confusion(study(True, study_id="s1"), [sample(True, study_id="s1")])["tp"] == 1
+    assert confusion(study(False, study_id="s1"), [sample(True, study_id="s1")])["fn"] == 1
+    assert confusion(study(True, study_id="s1"), [sample(False, study_id="s1")])["fp"] == 1
+
+
+def test_предсказания_разных_исследований_не_смешиваются():
+    """Предсказания двух исследований в одной оценке — явная ошибка, не нули."""
+    samples = [sample(True, study_id="s1"), sample(True, study_id="s2")]
+    with pytest.raises(QualityScopeError) as both:
+        compute_metrics([prediction()], samples)
+    assert "s1" in str(both.value) and "s2" in str(both.value)
+
+    with pytest.raises(QualityScopeError) as swapped:
+        confusion(study(True, study_id="s1"), [sample(True, study_id="s2")])
+    assert "Смешивать их нельзя" in str(swapped.value)
+
+
+def test_разные_исследования_считаются_по_одному_и_складываются():
+    """Правильный способ: группа на исследование, затем сумма матриц."""
+    per_study = [
+        confusion(study(True, study_id="s1"), [sample(True, study_id="s1")]),
+        confusion(study(False, study_id="s2"), [sample(True, study_id="s2")]),
+    ]
+    total = QualityMetrics(
+        **{key: sum(part[key] for part in per_study) for key in ("tp", "fp", "fn", "tn")}
+    )
+    assert (total.tp, total.fn, total.n_samples) == (1, 1, 2)
+    assert total.recall == 0.5
+
+
+def test_два_предсказания_по_одному_триггеру_дают_ошибку():
+    doubled = StudyPredictions("s1", (prediction(True), prediction(False)))
+    with pytest.raises(QualityScopeError, match="Два предсказания"):
+        confusion(doubled, [sample(True, study_id="s1")])
+
+
+def test_пустые_предсказания_дают_нули_а_не_ошибку():
+    assert compute_metrics([], []) == QualityMetrics()
+    assert confusion([], []) == {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
+    assert errors([], []) == []
+    # Ничего не сработало — это честные FN, а не ошибка.
+    assert compute_metrics([], [sample(True)]) == QualityMetrics(fn=1)
+
+
+def test_предсказания_без_разметки_требуют_исследование():
+    with pytest.raises(QualityScopeError, match="исследование"):
+        compute_metrics([prediction()], [])
+    # С явным study_id предсказания без разметки считаются как «ни одного образца».
+    assert compute_metrics(study(), []) == QualityMetrics()
+    with pytest.raises(ValueError, match="study_id"):
+        StudyPredictions("  ", ())
+
+
+def test_повторная_разметка_отвергается_загрузчиком(tmp_path):
+    """Дубль (исследование, триггер) ловится на входе, а не в метрике."""
+    (tmp_path / "gold.json").write_text(
+        json.dumps([dict(study_id="s1", trigger_id="polyp", label=True, split="gold")])
+    )
+    (tmp_path / "dup.json").write_text(
+        json.dumps([dict(study_id="s1", trigger_id="polyp", label=False, split="gold")])
+    )
+    with pytest.raises(QualityDataError, match="повторная разметка"):
+        load_labeled_samples(tmp_path)
+
+
+def test_split_сужает_оценку_до_одного_исследования():
+    """Фильтр по split применяется до проверки области."""
+    samples = [sample(True, study_id="s1"), sample(True, study_id="s2", split="synthetic")]
+    assert confusion(study(True, study_id="s1"), samples, "gold")["tp"] == 1
