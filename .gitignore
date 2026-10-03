@@ -31,3 +31,8 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+# отчёты о покрытии и кэши
+coverage.xml
+htmlcov/
+.ruff_cache/
+.pytest_cache/

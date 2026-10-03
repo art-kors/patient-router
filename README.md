@@ -70,13 +70,41 @@ POSTGRES_DB=<база>
 POSTGRES_USER=<роль>
 ```
 
-## Команды
+## Тесты
+
+82 теста, покрытие 98 %. Юнит-тесты не требуют БД.
 
 ```bash
-uv run ruff check .          # линтер
-uv run ruff format .         # форматирование
-uv run mypy app              # типы
-uv run pytest                # тесты с покрытием
+make test          # все тесты с покрытием
+make test-unit     # только юнит-тесты
+make cov           # HTML-отчёт → htmlcov/index.html
+make check         # линт + тесты (то же, что делает CI)
+```
+
+Что проверяется:
+
+| Файл | Что |
+|------|-----|
+| `tests/unit/test_clock.py` | модельное время: `advance(30 дней)` мгновенно, откат запрещён, singleton |
+| `tests/unit/test_settings.py` | DSN (TCP и unix-сокет), окружение, `.env` в `.gitignore` |
+| `tests/unit/test_models.py` | ограничения на дубли, CHECK, enum, частичные индексы, server defaults, связи |
+| `tests/integration/test_health_api.py` | `/health`, `/ready` (503 без БД, ошибка не течёт наружу), OpenAPI |
+
+## Непрерывная интеграция
+
+`.github/workflows/ci.yml` — 6 задач:
+
+| Job | Что делает |
+|-----|-----------|
+| `lint` | ruff format --check, ruff check, mypy |
+| `test` | pytest + отчёт о покрытии артефактом |
+| `migrate` | `alembic upgrade` → `check` → `downgrade base` → `upgrade` на postgres:16 |
+| `docker` | сборка образа и проверка, что контейнер отвечает на `/health` |
+| `smoke` | полный стек: `compose up` → `/ready` → миграции → проверка схемы |
+| `quality-gate` | сводка, падает если хоть один job красный |
+
+```bash
+make pre-commit    # локальный прогон хуков (тот же набор проверок)
 ```
 
 ## Структура

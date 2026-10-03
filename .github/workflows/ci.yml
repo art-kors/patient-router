@@ -1,0 +1,167 @@
+name: CI
+'on':
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+  workflow_dispatch: null
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  UV_VERSION: 0.12.13
+  PYTHON_VERSION: '3.12'
+jobs:
+  lint:
+    name: Линтинг и форматирование
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: astral-sh/setup-uv@v5
+      with:
+        version: ${{ env.UV_VERSION }}
+        enable-cache: true
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    - run: uv sync --frozen --all-extras
+      name: Установить зависимости
+    - run: uv run ruff format --check .
+      name: Проверить форматирование
+    - run: uv run ruff check --output-format=github .
+      name: Проверить линтер
+    - run: uv run mypy app
+      name: Проверить типы
+      continue-on-error: true
+  test:
+    name: Тесты
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: astral-sh/setup-uv@v5
+      with:
+        version: ${{ env.UV_VERSION }}
+        enable-cache: true
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    - run: uv sync --frozen --all-extras
+      name: Установить зависимости
+    - run: uv run pytest --cov=app --cov-report=xml --cov-report=term-missing
+      name: Прогнать тесты
+    - name: Приложить отчёт о покрытии
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage
+        path: coverage.xml
+        retention-days: 7
+  migrate:
+    name: Миграции
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: patient_router_test
+          POSTGRES_USER: pr
+          POSTGRES_PASSWORD: test_password
+        ports:
+        - 5432:5432
+        options: --health-cmd "pg_isready -U pr -d patient_router_test" --health-interval 5s --health-timeout
+          5s --health-retries 10
+    steps:
+    - uses: actions/checkout@v4
+    - uses: astral-sh/setup-uv@v5
+      with:
+        version: ${{ env.UV_VERSION }}
+        enable-cache: true
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    - run: uv sync --frozen --all-extras
+      name: Установить зависимости
+    - name: Применить миграции
+      env:
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: '5432'
+        POSTGRES_DB: patient_router_test
+        POSTGRES_USER: pr
+        POSTGRES_PASSWORD: test_password
+        ENVIRONMENT: test
+      run: uv run alembic upgrade head && uv run alembic check
+    - name: Проверить обратимость (downgrade + upgrade)
+      env:
+        POSTGRES_HOST: localhost
+        POSTGRES_DB: patient_router_test
+        POSTGRES_USER: pr
+        POSTGRES_PASSWORD: test_password
+      run: uv run alembic downgrade base && uv run alembic upgrade head && echo '✓ миграции обратимы'
+  docker:
+    name: Сборка образа
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: docker/setup-buildx-action@v3
+    - name: Собрать образ
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: Dockerfile
+        push: false
+        load: true
+        tags: patient-router:ci
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    - name: Проверить живость контейнера
+      run: "docker run -d --name pr-test -p 8000:8000 patient-router:ci\nfor i in $(seq 1 20); do\n  if\
+        \ curl -fsS http://localhost:8000/health > /dev/null 2>&1; then\n    echo '✓ контейнер ответил\
+        \ на /health'\n    curl -s http://localhost:8000/health\n    exit 0\n  fi\n  sleep 2\ndone\necho\
+        \ '✗ контейнер не ответил'\ndocker logs pr-test\nexit 1"
+    - name: Остановить контейнер
+      if: always()
+      run: docker rm -f pr-test || true
+  smoke:
+    name: 'E2E-smoke: БД и приложение'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - run: docker compose up -d --build db app
+      name: Поднять стек
+    - name: Дождаться готовности
+      run: "for i in $(seq 1 30); do\n  if curl -fsS http://localhost:8000/ready > /dev/null 2>&1; then\n\
+        \    echo '✓ приложение готово'\n    curl -s http://localhost:8000/ready\n    exit 0\n  fi\n \
+        \ sleep 2\ndone\ndocker compose logs\nexit 1"
+    - run: docker compose exec -T app alembic upgrade head
+      name: Применить миграции
+    - name: Проверить, что схема создана
+      run: 'TABLES=$(docker compose exec -T db psql -U pr -d patient_router -tAc "SELECT count(*) FROM
+        information_schema.tables WHERE table_schema=''public'' AND table_type=''BASE TABLE''")
+
+        echo "таблиц: $TABLES"
+
+        test "$TABLES" -ge 20'
+    - run: docker compose down -v
+      if: always()
+      name: Остановить стек
+  quality-gate:
+    name: Итог
+    runs-on: ubuntu-latest
+    needs:
+    - lint
+    - test
+    - migrate
+    - docker
+    - smoke
+    if: always()
+    steps:
+    - name: Сводка
+      run: "echo \"lint:     ${{ needs.lint.result }}\"\necho \"test:     ${{ needs.test.result }}\"\n\
+        echo \"migrate:  ${{ needs.migrate.result }}\"\necho \"docker:   ${{ needs.docker.result }}\"\n\
+        echo \"smoke:    ${{ needs.smoke.result }}\"\nif [ \"${{ needs.lint.result }}\" != \"success\"\
+        \ ] || [ \"${{ needs.test.result }}\" != \"success\" ] || [ \"${{ needs.migrate.result }}\" !=\
+        \ \"success\" ] || [ \"${{ needs.docker.result }}\" != \"success\" ] || [ \"${{ needs.smoke.result\
+        \ }}\" != \"success\" ]; then\n  echo '::error::часть проверок провалилась'\n  exit 1\nfi\necho\
+        \ '::notice::все проверки зелёные'"

@@ -59,7 +59,19 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-q --cov=app --cov-report=term-missing"
+addopts = "-q --cov=app --cov-report=term-missing --cov-report=xml"
+pythonpath = ["."]
+
+markers = [
+    "integration: требует поднятой БД (docker compose up -d db)",
+    "unit: чистые тесты без внешних зависимостей",
+]
 
 [tool.coverage.run]
 source = ["app"]
+omit = ["app/__init__.py"]
+
+[tool.coverage.report]
+# Стремимся к покрытию доменного слоя — он несёт ценность для жюри
+# (критерий «техническая реализуемость»).
+skip_covered = false

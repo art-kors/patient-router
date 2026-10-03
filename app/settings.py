@@ -50,10 +50,7 @@ class Settings(BaseSettings):
 
         if self.postgres_host.startswith("/"):
             # unix-сокет: host передаётся параметром, а не частью authority
-            return (
-                f"postgresql+asyncpg://{user}@/{self.postgres_db}"
-                f"?host={self.postgres_host}"
-            )
+            return f"postgresql+asyncpg://{user}@/{self.postgres_db}?host={self.postgres_host}"
 
         return (
             f"postgresql+asyncpg://{user}"

@@ -124,6 +124,13 @@ class Study(Base):
     __table_args__ = (
         Index("idx_study_date", "study_date"),
         Index("idx_study_type", "study_type"),
+        # полнотекстовый поиск по pg_trgm для отладки и разметки
+        Index(
+            "idx_study_raw_text_trgm",
+            "raw_text",
+            postgresql_using="gin",
+            postgresql_ops={"raw_text": "gin_trgm_ops"},
+        ),
     )
 
     id: Mapped[UUID] = _uuid()
@@ -187,6 +194,13 @@ class Finding(Base):
     __table_args__ = (
         Index("idx_finding_study", "study_id"),
         Index("idx_finding_name", "finding"),
+        # быстрый подбор аналогичных находок между протоколами
+        Index(
+            "idx_finding_name_trgm",
+            "finding",
+            postgresql_using="gin",
+            postgresql_ops={"finding": "gin_trgm_ops"},
+        ),
     )
 
     id: Mapped[UUID] = _uuid()
@@ -425,6 +439,13 @@ class Route(Base):
         UniqueConstraint("trigger_match_id", name="uq_route_trigger_match"),
         Index("idx_route_patient", "patient_id"),
         Index("idx_route_status", "status"),
+        # ★ баннер «Незавершённый клинический маршрут» и отчёт о потерях
+        Index(
+            "idx_route_unfinished",
+            "patient_id",
+            "created_at",
+            postgresql_where=text("closed_at IS NULL"),
+        ),
     )
 
     id: Mapped[UUID] = _uuid()
@@ -631,6 +652,12 @@ class Hospitalization(Base):
             name="hospitalization_status_check",
         ),
         Index("idx_hosp_route", "route_id"),
+        # ★ контроль «назначена ли дата госпитализации ≤ 3 рабочих дней»
+        Index(
+            "idx_hosp_no_date",
+            "route_id",
+            postgresql_where=text("scheduled_date IS NULL AND status = 'referred'"),
+        ),
     )
 
     id: Mapped[UUID] = _uuid()
