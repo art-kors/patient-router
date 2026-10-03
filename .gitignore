@@ -36,3 +36,6 @@ coverage.xml
 htmlcov/
 .ruff_cache/
 .pytest_cache/
+
+# рабочий процесс: локальный канбан команды, не часть поставки
+KANBAN.md
