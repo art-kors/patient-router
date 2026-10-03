@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     # Каталог с routing_matrix.json и прочими настройками.
     # В контейнере — /app/config, локально — ./config относительно корня.
     config_dir: str = "config"
+    labeled_data_dir: str = "data/labeled"
 
     @property
     def routing_matrix_path(self) -> str:
