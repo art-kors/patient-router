@@ -58,16 +58,96 @@ class QualityMetrics:
         return self.tp + self.fp + self.fn + self.tn
 
 
-def _pairs(predictions, samples, split):
-    """Предсказания относятся к одному исследованию; отсутствие — несрабатывание."""
-    matches = {match.trigger.trigger_id: match for match in predictions}
-    for sample in samples:
-        if split is None or sample.split == split:
-            yield sample, matches.get(sample.trigger_id)
+class QualityScopeError(ValueError):
+    """Предсказания и разметка относятся к разным исследованиям.
+
+    Отдельный класс, а не QualityDataError: ошибка не в файлах разметки,
+    а в том, как вызывающий код собрал их в одну оценку. Выдуманные числа
+    хуже явного отказа, поэтому считать метрику в таком случае нельзя.
+    """
+
+
+@dataclass(frozen=True)
+class StudyPredictions:
+    """Предсказания одного исследования с явным study_id.
+
+    TriggerMatch протокола не знает — движок принимает находки, а не запись
+    из БД. Обёртка восстанавливает принадлежность к исследованию, чтобы
+    сопоставление шло по паре (study_id, trigger_id), а не по одному trigger_id.
+    """
+
+    study_id: str
+    matches: tuple[TriggerMatch, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.study_id, str) or not self.study_id.strip():
+            raise ValueError("study_id предсказаний должен быть непустой строкой")
+
+
+def _single_study(samples: list[LabeledSample]) -> str:
+    """study_id всех образцов; пусто — образцов нет; >1 — понятная ошибка."""
+    study_ids = {sample.study_id for sample in samples}
+    if len(study_ids) > 1:
+        listed = ", ".join(sorted(study_ids))
+        raise QualityScopeError(
+            "Одна оценка — одно исследование, а разметка относится к нескольким: "
+            f"{listed}. Сгруппируйте образцы по study_id и сложите матрицы."
+        )
+    return next(iter(study_ids), "")
+
+
+def _as_study(predictions, samples: list[LabeledSample]) -> tuple[str, tuple[TriggerMatch, ...]]:
+    """Свести предсказания к паре (study_id, матчи).
+
+    StudyPredictions проверяем: он несёт исследование, и мы убеждаемся, что
+    разметка — про него же. Список TriggerMatch допускаем для удобства вызовов,
+    но тогда исследование выводится только из разметки, и смешивание
+    исследований отсекается ошибкой, а не «всё не сработало».
+    """
+    if isinstance(predictions, StudyPredictions):
+        sample_study = _single_study(samples)
+        if sample_study and sample_study != predictions.study_id:
+            raise QualityScopeError(
+                f"Предсказания получены для исследования {predictions.study_id}, "
+                f"а разметка — для {sample_study}. Смешивать их нельзя."
+            )
+        return predictions.study_id, predictions.matches
+    return _single_study(samples), tuple(predictions)
+
+
+def _pairs(predictions, samples: list[LabeledSample], split: str | None):
+    """Сопоставить предсказания с разметкой по паре (исследование, триггер).
+
+    Отсутствие предсказания по триггеру — несрабатывание. Предсказание чужого
+    исследования или два результата по одному триггеру — ошибка: иначе тихо
+    получились бы бессмысленные метрики.
+
+    Границы оценки задаёт split: проверка области идёт по его выборке, поэтому
+    можно передать всю разметку и попросить один срез.
+    """
+    selected = [s for s in samples if split is None or s.split == split]
+    study_id, predictions = _as_study(predictions, selected)
+    if not study_id and predictions:
+        raise QualityScopeError(
+            "Нет разметки, по которой можно подтвердить исследование предсказаний. "
+            "Передайте StudyPredictions(study_id, ...) или образцы одного исследования."
+        )
+    matches: dict[tuple[str, str], TriggerMatch] = {}
+    for match in predictions:
+        key = (study_id, match.trigger.trigger_id)
+        if key in matches:
+            raise QualityScopeError(
+                f"Два предсказания по триггеру {key[1]} для исследования {key[0]}: "
+                "одно исследование даёт один результат по триггеру."
+            )
+        matches[key] = match
+    yield from ((sample, matches.get((sample.study_id, sample.trigger_id))) for sample in selected)
 
 
 def compute_metrics(
-    predictions: list[TriggerMatch], samples: list[LabeledSample], split: str | None = None
+    predictions: StudyPredictions | list[TriggerMatch],
+    samples: list[LabeledSample],
+    split: str | None = None,
 ) -> QualityMetrics:
     """Посчитать матрицу для выбранной части разметки."""
     counts = dict.fromkeys(("tp", "fp", "fn", "tn"), 0)
@@ -78,13 +158,22 @@ def compute_metrics(
     return QualityMetrics(**counts)
 
 
-def confusion(predictions, samples, split=None) -> dict:
+def confusion(
+    predictions: StudyPredictions | list[TriggerMatch],
+    samples: list[LabeledSample],
+    split: str | None = None,
+) -> dict:
     """Вернуть матрицу словарём."""
     metrics = compute_metrics(predictions, samples, split)
     return {key: getattr(metrics, key) for key in ("tp", "fp", "fn", "tn")}
 
 
-def errors(predictions, samples, split=None, limit=50) -> list[dict]:
+def errors(
+    predictions: StudyPredictions | list[TriggerMatch],
+    samples: list[LabeledSample],
+    split: str | None = None,
+    limit: int = 50,
+) -> list[dict]:
     """Расхождения FP и FN с цитатой и правилом для проверки врачом."""
     result = []
     for sample, match in _pairs(predictions, samples, split):
