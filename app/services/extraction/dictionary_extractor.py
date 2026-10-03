@@ -203,6 +203,4 @@ def _is_negative(haystack: str, line_start: int, line_end: int, display_name: st
       2. шаблон отрицания этой находки из конфига.
     """
     line = haystack[line_start:line_end].lower()
-    if any(marker in line for marker in _NEGATION_MARKERS):
-        return True
-    return False
+    return any(marker in line for marker in _NEGATION_MARKERS)
