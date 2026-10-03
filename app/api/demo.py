@@ -3,29 +3,38 @@
 Ручки работают поверх боевого ``TimerEngine``: таймеры лежат в таблице ``timer``,
 поэтому ``/demo/clock/advance`` отдаёт реальные эффекты, а не очередь в памяти.
 Модельное время живёт само по себе — для показа часов и каталога сценариев БД
-не нужна, сессия подключается лениво и тихо отключается, если база недоступна.
+не нужна. Все ручки берут обычную сессию из пула и сами решают, что делать с
+ошибкой базы; отдельной пробы доступности с жёстким таймаутом нет намеренно:
+пока пул занят, свежее соединение не укладывалось в срок, и живая БД
+объявлялась недоступной — прямо на защите.
 """
 
-import asyncio
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.clock as clock_module
 from app.clock import ModelClock
-from app.db import SessionFactory
+from app.db import get_session
 from app.models import Timer
 from app.services.timers import TimerEngine
 
 router = APIRouter(prefix="/api/v1/demo", tags=["demo"])
 START = datetime(2026, 8, 26, 14, 32, tzinfo=UTC)
-DB_PROBE_TIMEOUT = 2.0
+DB_UNAVAILABLE = {
+    "code": "DATABASE_UNAVAILABLE",
+    "message": "Таймеры хранятся в БД — поднимите её (docker compose up -d db).",
+}
+# Ошибки драйвера и ОС на подключении: asyncpg не оборачивает их в
+# ``SQLAlchemyError``, поэтому ``ConnectionRefusedError`` доходит до нас своим
+# классом. Для ручки, которой база нужна, это всё равно «базы нет».
+DB_DOWN = (SQLAlchemyError, OSError)
 
 
 class ClockOut(BaseModel):
@@ -57,41 +66,25 @@ class SetIn(BaseModel):
     to: AwareDatetime
 
 
-async def optional_session() -> AsyncIterator[AsyncSession | None]:
-    """Сессия, если БД отвечает: показ часов не должен падать без базы.
+def _db_unavailable() -> HTTPException:
+    """Один понятный ответ на все ручки, которым база нужна для данных."""
+    return HTTPException(status_code=503, detail=dict(DB_UNAVAILABLE))
 
-    Соединение проверяется с коротким таймаутом один раз на запрос. Если базы
-    нет — отдаём ``None``, и часы, и каталог сценариев продолжают работать.
+
+async def db_available(session: AsyncSession) -> bool:
+    """Ответить, работает ли база, не замеряя её жёстким таймаутом.
+
+    Проверка идёт через ``text("SELECT 1")`` по уже полученной из пула сессии.
+    Пул сам переиспользует и при необходимости переподключает соединение, так
+    что запрос не может «опоздать» из-за занятого пула: он либо отвечает, либо
+    база действительно лежит.
     """
-    session = SessionFactory()
     try:
-        await asyncio.wait_for(session.connect(), DB_PROBE_TIMEOUT)
-    except Exception:
-        await session.close()
-        yield None
-        return
-    try:
-        yield session
-    except Exception:
+        await session.execute(text("SELECT 1"))
+    except DB_DOWN:
         await session.rollback()
-        raise
-    finally:
-        await session.close()
-
-
-async def require_session(
-    session: AsyncSession | None = Depends(optional_session),
-) -> AsyncSession:
-    """Для чтения таймеров БД обязательна — иначе показать нечего."""
-    if session is None:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "code": "DATABASE_UNAVAILABLE",
-                "message": "Таймеры хранятся в БД — поднимите её (docker compose up -d db).",
-            },
-        )
-    return session
+        return False
+    return True
 
 
 def _model_clock() -> ModelClock:
@@ -117,13 +110,16 @@ def read_clock() -> ClockOut:
     )
 
 
-async def _advance(hours: float, session: AsyncSession | None) -> dict[str, Any]:
+async def _advance(hours: float, session: AsyncSession) -> dict[str, Any]:
     """Собрать эффекты и длительность, чтобы подтвердить прокрутку недель за секунды.
 
     Двигатель сам отдаёт ``from``/``to``/``fired``/``routes_affected``/
-    ``elapsed_ms``; коммит остаётся ответственностью вызывающего кода.
+    ``elapsed_ms``; коммит остаётся ответственностью вызывающего кода. База
+    нужна только ради записанных таймеров: если её нет, модельное время
+    двигается по слушателям часов, и показ продолжается.
     """
-    engine = TimerEngine(session)
+    usable = await db_available(session)
+    engine = TimerEngine(session if usable else None)
     try:
         result = await engine.advance_clock(hours)
     except ValueError as exc:
@@ -145,13 +141,14 @@ async def _advance(hours: float, session: AsyncSession | None) -> dict[str, Any]
         "fired": list(result["fired"]),
         "routes_affected": result["routes_affected"],
         "elapsed_ms": result["elapsed_ms"],
+        "database": "ok" if usable else "unavailable",
     }
 
 
 @router.post("/clock/advance", summary="Прокрутить время и выполнить таймеры")
 async def advance(
     payload: AdvanceIn,
-    session: AsyncSession | None = Depends(optional_session),
+    session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Запустить просроченные действия без реального ожидания недель."""
     _model_clock()
@@ -162,7 +159,7 @@ async def advance(
 @router.post("/clock/set", summary="Перейти к моменту сценария")
 async def set_time(
     payload: SetIn,
-    session: AsyncSession | None = Depends(optional_session),
+    session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Перейти вперёд с таймерами, исключив повтор эффектов при откате."""
     clock = _model_clock()
@@ -175,31 +172,33 @@ async def set_time(
 
 
 @router.post("/clock/reset", response_model=ClockOut, summary="Вернуться к старту демо")
-async def reset_time(
-    session: AsyncSession | None = Depends(optional_session),
-) -> ClockOut:
+async def reset_time(session: AsyncSession = Depends(get_session)) -> ClockOut:
     """Начать показ заново, погасив несработавшие таймеры предыдущего демо."""
     clock = _model_clock()
     clock.reset(START)
-    if session is not None:
+    if await db_available(session):
         await session.execute(update(Timer).where(~Timer.fired).values(fired=True, fired_at=None))
     return read_clock()
 
 
 @router.get("/timers", summary="Посмотреть запланированные таймеры")
 async def read_timers(
-    session: AsyncSession = Depends(require_session),
+    session: AsyncSession = Depends(get_session),
     route_id: UUID | None = None,
 ) -> list[dict[str, Any]]:
     """Показать ближайшие действия, чтобы выбрать следующий шаг прокрутки.
 
     Список берётся из таблицы ``timer`` напрямую: ``TimerEngine.due`` отдаёт
-    только просроченное, а демонстратору нужен весь горизонт маршрута.
+    только просроченное, а демонстратору нужен весь горизонт маршрута. Здесь
+    база обязательна, и 503 означает только одно: базы действительно нет.
     """
     statement = select(Timer).where(~Timer.fired).order_by(Timer.due_at, Timer.id)
     if route_id is not None:
         statement = statement.where(Timer.route_id == route_id)
-    timers = (await session.scalars(statement)).all()
+    try:
+        timers = (await session.scalars(statement)).all()
+    except DB_DOWN as exc:
+        raise _db_unavailable() from exc
     return [
         {
             "id": str(timer.id),
