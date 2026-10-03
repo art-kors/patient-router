@@ -1,21 +1,31 @@
-"""Управление демо: показать недельные клинические сценарии за секунды."""
+"""Управление демо: показать недельные клинические сценарии за секунды.
 
+Ручки работают поверх боевого ``TimerEngine``: таймеры лежат в таблице ``timer``,
+поэтому ``/demo/clock/advance`` отдаёт реальные эффекты, а не очередь в памяти.
+Модельное время живёт само по себе — для показа часов и каталога сценариев БД
+не нужна, сессия подключается лениво и тихо отключается, если база недоступна.
+"""
+
+import asyncio
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from time import perf_counter
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
-from weakref import WeakKeyDictionary
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.clock as clock_module
 from app.clock import ModelClock
-from app.services.timers import TimerEngine, advance_clock
+from app.db import SessionFactory
+from app.models import Timer
+from app.services.timers import TimerEngine
 
 router = APIRouter(prefix="/api/v1/demo", tags=["demo"])
 START = datetime(2026, 8, 26, 14, 32, tzinfo=UTC)
-_engines: WeakKeyDictionary[ModelClock, TimerEngine] = WeakKeyDictionary()
+DB_PROBE_TIMEOUT = 2.0
 
 
 class ClockOut(BaseModel):
@@ -47,6 +57,43 @@ class SetIn(BaseModel):
     to: AwareDatetime
 
 
+async def optional_session() -> AsyncIterator[AsyncSession | None]:
+    """Сессия, если БД отвечает: показ часов не должен падать без базы.
+
+    Соединение проверяется с коротким таймаутом один раз на запрос. Если базы
+    нет — отдаём ``None``, и часы, и каталог сценариев продолжают работать.
+    """
+    session = SessionFactory()
+    try:
+        await asyncio.wait_for(session.connect(), DB_PROBE_TIMEOUT)
+    except Exception:
+        await session.close()
+        yield None
+        return
+    try:
+        yield session
+    except Exception:
+        await session.rollback()
+        raise
+    finally:
+        await session.close()
+
+
+async def require_session(
+    session: AsyncSession | None = Depends(optional_session),
+) -> AsyncSession:
+    """Для чтения таймеров БД обязательна — иначе показать нечего."""
+    if session is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "DATABASE_UNAVAILABLE",
+                "message": "Таймеры хранятся в БД — поднимите её (docker compose up -d db).",
+            },
+        )
+    return session
+
+
 def _model_clock() -> ModelClock:
     """Защитить системные часы от команд демонстратора."""
     clock = clock_module.get_clock()
@@ -61,17 +108,8 @@ def _model_clock() -> ModelClock:
     return clock
 
 
-def get_timer_engine(clock: ModelClock) -> TimerEngine:
-    """Общая очередь для планирования и просмотра таймеров текущего демо."""
-    if clock not in _engines:
-        engine = TimerEngine()
-        clock.register(engine)
-        _engines[clock] = engine
-    return _engines[clock]
-
-
 @router.get("/clock", response_model=ClockOut, summary="Текущее модельное время")
-def read_clock():
+def read_clock() -> ClockOut:
     """Показать жюри точку сценария и используемый источник времени."""
     clock = clock_module.get_clock()
     return ClockOut(
@@ -79,61 +117,98 @@ def read_clock():
     )
 
 
-def _advance(clock: ModelClock, hours: float) -> dict:
-    """Собрать эффекты и длительность, чтобы подтвердить прокрутку недель за секунды."""
-    started = perf_counter()
-    before = clock.now()
-    get_timer_engine(clock)
+async def _advance(hours: float, session: AsyncSession | None) -> dict[str, Any]:
+    """Собрать эффекты и длительность, чтобы подтвердить прокрутку недель за секунды.
+
+    Двигатель сам отдаёт ``from``/``to``/``fired``/``routes_affected``/
+    ``elapsed_ms``; коммит остаётся ответственностью вызывающего кода.
+    """
+    engine = TimerEngine(session)
     try:
-        effects = advance_clock(clock, hours)
-    except (OverflowError, ValueError) as exc:
+        result = await engine.advance_clock(hours)
+    except ValueError as exc:
+        code = str(exc).split(":")[0]
+        if code == "CLOCK_NOT_MOCK":
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "CLOCK_NOT_MOCK",
+                    "message": "Для демо включите USE_MODEL_CLOCK=true.",
+                },
+            ) from exc
+        raise HTTPException(422, detail="Интервал выходит за допустимый диапазон времени") from exc
+    except OverflowError as exc:
         raise HTTPException(422, detail="Интервал выходит за допустимый диапазон времени") from exc
     return {
-        "from": before,
-        "to": clock.now(),
-        "fired": effects,
-        "routes_affected": len({effect.route_id for effect in effects}),
-        "elapsed_ms": (perf_counter() - started) * 1000,
+        "from": result["from"],
+        "to": result["to"],
+        "fired": list(result["fired"]),
+        "routes_affected": result["routes_affected"],
+        "elapsed_ms": result["elapsed_ms"],
     }
 
 
 @router.post("/clock/advance", summary="Прокрутить время и выполнить таймеры")
-def advance(payload: AdvanceIn):
+async def advance(
+    payload: AdvanceIn,
+    session: AsyncSession | None = Depends(optional_session),
+) -> dict[str, Any]:
     """Запустить просроченные действия без реального ожидания недель."""
-    clock = _model_clock()
+    _model_clock()
     hours = payload.hours if payload.hours is not None else payload.days * 24
-    return _advance(clock, hours)
+    return await _advance(hours, session)
 
 
 @router.post("/clock/set", summary="Перейти к моменту сценария")
-def set_time(payload: SetIn):
+async def set_time(
+    payload: SetIn,
+    session: AsyncSession | None = Depends(optional_session),
+) -> dict[str, Any]:
     """Перейти вперёд с таймерами, исключив повтор эффектов при откате."""
     clock = _model_clock()
-    if payload.to < clock.now():
+    current = clock.now()
+    if payload.to < current:
         raise HTTPException(
             409, detail={"code": "CLOCK_IN_PAST", "message": "Откат модельного времени запрещён."}
         )
-    return _advance(clock, (payload.to - clock.now()).total_seconds() / 3600)
+    return await _advance((payload.to - current).total_seconds() / 3600, session)
 
 
 @router.post("/clock/reset", response_model=ClockOut, summary="Вернуться к старту демо")
-def reset_time():
-    """Начать показ заново, очистив слушателей и очередь предыдущего демо."""
+async def reset_time(
+    session: AsyncSession | None = Depends(optional_session),
+) -> ClockOut:
+    """Начать показ заново, погасив несработавшие таймеры предыдущего демо."""
     clock = _model_clock()
     clock.reset(START)
-    _engines.pop(clock, None)
+    if session is not None:
+        await session.execute(update(Timer).where(~Timer.fired).values(fired=True, fired_at=None))
     return read_clock()
 
 
 @router.get("/timers", summary="Посмотреть запланированные таймеры")
-def read_timers(route_id: UUID | None = None):
-    """Показать ближайшие действия, чтобы выбрать следующий шаг прокрутки."""
-    clock = clock_module.get_clock()
-    if not isinstance(clock, ModelClock):
-        return []
+async def read_timers(
+    session: AsyncSession = Depends(require_session),
+    route_id: UUID | None = None,
+) -> list[dict[str, Any]]:
+    """Показать ближайшие действия, чтобы выбрать следующий шаг прокрутки.
+
+    Список берётся из таблицы ``timer`` напрямую: ``TimerEngine.due`` отдаёт
+    только просроченное, а демонстратору нужен весь горизонт маршрута.
+    """
+    statement = select(Timer).where(~Timer.fired).order_by(Timer.due_at, Timer.id)
+    if route_id is not None:
+        statement = statement.where(Timer.route_id == route_id)
+    timers = (await session.scalars(statement)).all()
     return [
-        {"due_at": t.due_at, "timer_type": t.effect.timer_type, "route_id": t.effect.route_id}
-        for t in get_timer_engine(clock).pending(route_id)
+        {
+            "id": str(timer.id),
+            "route_id": str(timer.route_id),
+            "timer_type": str(timer.timer_type),
+            "due_at": timer.due_at,
+            "channel": timer.channel,
+        }
+        for timer in timers
     ]
 
 
