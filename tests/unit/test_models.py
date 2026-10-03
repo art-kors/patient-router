@@ -212,8 +212,19 @@ class TestForeignKeys:
 
     def test_каскадное_удаление_от_patient(self):
         """Пациент удалён → каскадом уходят его исследования и маршруты."""
-        fk = Study.__table__.c["patient_id"].foreign_keys.pop()
+        fk = next(iter(Study.__table__.c["patient_id"].foreign_keys))
         assert fk.ondelete == "CASCADE"
+
+    def test_проверка_ondelete_не_мутирует_метаданные(self):
+        """Тест читает ondelete, но не удаляет FK из общих метаданных.
+
+        Регрессия: .pop() на foreign_keys ломал инициализацию маппингов
+        для всех следующих тестов в том же процессе.
+        """
+        column = Study.__table__.c["patient_id"]
+        before = len(list(column.foreign_keys))
+        next(iter(column.foreign_keys))
+        assert len(list(column.foreign_keys)) == before, "тест не должен менять метаданные"
 
 
 class TestMetadataIntegrity:
