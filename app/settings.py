@@ -28,6 +28,16 @@ class Settings(BaseSettings):
     timezone: str = "Europe/Moscow"
     use_model_clock: bool = False
 
+    # --- конфигурация ---
+    # Каталог с routing_matrix.json и прочими настройками.
+    # В контейнере — /app/config, локально — ./config относительно корня.
+    config_dir: str = "config"
+
+    @property
+    def routing_matrix_path(self) -> str:
+        """Путь к матрице маршрутизации."""
+        return f"{self.config_dir}/routing_matrix.json"
+
     # --- миграции ---
     # пусто = использовать схему из DSN (в docker это public).
     # Нужно для локальной проверки миграций в отдельной схеме.
