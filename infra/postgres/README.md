@@ -8,6 +8,7 @@
 
 ```bash
 cd infra/postgres
+cp .env.example .env  # выберите свободный POSTGRES_PORT перед запуском
 
 # поднять БД (схема + сиды применятся автоматически при первом старте)
 docker compose up -d
@@ -16,7 +17,7 @@ docker compose up -d
 docker compose ps
 ```
 
-Подключение:
+Подключение при `POSTGRES_PORT=5433` из `.env.example` (для другого порта измените `-p`):
 
 ```bash
 psql -h localhost -p 5433 -U pr -d patient_router
@@ -101,14 +102,16 @@ docker compose up -d
 
 ## Переменные окружения
 
-Все параметры переопределяются (`.env` рядом с `compose.yml`):
+Все параметры переопределяются (`.env` рядом с `compose.yml` или окружение).
+`POSTGRES_PORT` обязателен: пустое или отсутствующее значение Compose
+отклоняет до запуска контейнеров; порт должен быть свободен.
 
 | Переменная | По умолчанию | Назначение |
 |------------|--------------|------------|
 | `POSTGRES_DB` | `patient_router` | Имя БД |
 | `POSTGRES_USER` | `pr` | Пользователь |
 | `POSTGRES_PASSWORD` | `pr_local_dev` | Пароль (**сменить для не-dev**) |
-| `POSTGRES_PORT` | `5433` | Порт на хосте |
+| `POSTGRES_PORT` | Нет; в примере `5433` | Обязательный свободный порт на хосте |
 | `TZ` | `Europe/Moscow` | Часовой пояс контейнера |
 
 ## Проверено

@@ -151,6 +151,14 @@ jobs:
   smoke:
     name: 'E2E-smoke: БД и приложение'
     runs-on: ubuntu-latest
+    # Джоба получает отдельный runner: фиксированные порты не пересекаются
+    # со стендами разработчиков. APP_PORT совпадает с адресом проверки /ready.
+    # Compose требует все четыре порта даже для неактивных профилей.
+    env:
+      POSTGRES_PORT: '5433'
+      APP_PORT: '8000'
+      DEV_PORT: '8001'
+      DEMO_PORT: '8010'
     steps:
     - uses: actions/checkout@v4
     - run: docker compose up -d --build db app

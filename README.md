@@ -107,8 +107,9 @@ docker compose up -d --build  # поднимет db + app
 docker compose exec -T app alembic upgrade head
 ```
 
-> `docker compose up` **не** применяет миграции. Это осознанно: на боевой среде
-> схема меняется явно, а не при старте контейнера.
+> Сервисы `app` и `demo` выполняют `alembic upgrade head` перед запуском
+> приложения. Команда выше повторяет миграции безопасно; при ошибке миграций
+> приложение не запускается.
 
 ### Демо для жюри: запуск и загрузка данных
 
@@ -131,8 +132,9 @@ docker compose exec -T demo python scripts/seed_demo.py
 Compose отклоняет ещё до обращения к Docker. Нужны все четыре переменные
 портов, включая сервисы вне выбранного профиля.
 
-Демо доступно на **http://localhost:8010** (свой порт, чтобы не драться с
-`app` на 8000):
+При портах из `.env.example` демо доступно на **http://localhost:8010**
+(свой порт, чтобы не драться с `app` на 8000). Если порты изменены,
+подставьте выбранный `DEMO_PORT` в адреса ниже:
 
 ```bash
 curl localhost:8010/health
@@ -148,10 +150,9 @@ curl localhost:8010/api/v1/demo/scenarios
 | `demo` | 8010 | `"true"` жёстко — модельное время | `--profile demo` |
 | `dev` | 8001 | `${USE_MODEL_CLOCK:-true}` + hot reload | `--profile dev` |
 
-Демо — единственный сервис, который сам выполняет `alembic upgrade head` при
-старте: это одноразовый стенд, и отдельный шаг «не забудь накатить миграции»
-на защите стоил бы дороже, чем автоматизация. У `app` и `dev` поведение
-прежнее.
+Порты в таблице — значения из `.env.example`, а не дефолты Compose.
+Сервисы `app` и `demo` сами выполняют `alembic upgrade head` при старте;
+для `dev` миграции нужно применить отдельно.
 
 > [!important] Почему раньше требовался `sudo -E`
 > `sudo` по умолчанию сбрасывает переменные окружения (`env_reset`), поэтому
@@ -162,6 +163,7 @@ curl localhost:8010/api/v1/demo/scenarios
 ### Вариант B: локально без Docker для приложения
 
 ```bash
+cp .env.example .env          # если .env ещё нет; выберите свободные порты
 uv sync --frozen --all-extras   # зависимости из uv.lock
 docker compose up -d db         # только БД на localhost:5433
 uv run alembic upgrade head     # создать схему
