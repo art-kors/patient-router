@@ -36,6 +36,14 @@ EMPTY = """
 ЗАКЛЮЧЕНИЕ: УЗ патологии на момент исследования не выявлено.
 """
 
+EMERGENCY = "Заключение: стеноз 80%."
+"""Экстренная находка: значимый стеноз артерий нижних конечностей.
+
+У этого триггера emergency_flag=true — маршрут создавать нельзя.
+"""
+
+EMERGENCY_STUDY = "УЗДГ артерий нижних конечностей"
+
 pytestmark = pytest.mark.anyio
 
 
@@ -184,6 +192,83 @@ class TestSafety:
         assert response.status_code == 200
 
     async def test_без_поля_text_не_ломает(self, analyze):
+        async with analyze as c:
+            response = await c.post("/api/v1/analyze", json={})
+        assert response.status_code == 200
+
+
+class TestEmergency:
+    """ЭКСТРЕННОЕ: маршрут не создаётся, персонал получает эскалацию.
+
+    Тот же запрет, что в routing.create_from_match: emergency_flag=true
+    означает «не маршрутизировать автоматически». Предпросмотр /analyze
+    обязан показывать то же решение, что применит система, иначе он
+    врёт о том, что будет сделано с пациентом.
+    """
+
+    async def test_экстренная_находка_блокирует_маршрут(self, analyze):
+        async with analyze as c:
+            response = await c.post(
+                "/api/v1/analyze",
+                json={"text": EMERGENCY, "study_type": EMERGENCY_STUDY},
+            )
+        body = response.json()
+        assert response.status_code == 200
+        assert body["is_emergency"] is True
+        assert body["emergency_notice"]
+        assert body["route_would_be_created"] is False, (
+            "экстренная находка не должна создавать маршрут"
+        )
+
+    async def test_экстренная_находка_блокирует_маршрут_и_при_другой_находке(self, analyze):
+        """Экстренность — не «побеждает один триггер»: она блокирует маршрут целиком.
+
+        В протоколе есть и обычный полип, и экстренный стеноз. Полип сам
+        по себе дал бы маршрут, но экстренность в этом же протоколе
+        означает эскалацию вместо автомаршрута.
+        """
+        async with analyze as c:
+            response = await c.post(
+                "/api/v1/analyze",
+                json={"text": f"{EMERGENCY} Полип эндометрия 12 мм."},
+            )
+        body = response.json()
+        assert response.status_code == 200
+        assert body["is_emergency"] is True
+        assert body["route_would_be_created"] is False
+        assert body["winning_trigger"], "сработавший триггер остаётся в объяснении"
+
+    async def test_обычная_находка_по_прежнему_создаёт_маршрут(self, analyze):
+        """Обратная сторона: запрет не должен ломать нормальное решение."""
+        async with analyze as c:
+            body = (
+                await c.post(
+                    "/api/v1/analyze",
+                    json={"text": TRIGGERED, "study_type": "УЗИ органов малого таза"},
+                )
+            ).json()
+        assert body["is_emergency"] is False
+        assert body["route_would_be_created"] is True
+        assert body["winning_trigger"]
+
+
+class TestRequestValidation:
+    """Невалидный тип — это 422 от Pydantic, а не 500 из глубины экстрактора."""
+
+    @pytest.mark.parametrize("payload", [{"text": 123}, {"text": ["a"]}, {"text": {"a": 1}}])
+    async def test_нестроковый_text_даёт_422(self, analyze, payload):
+        async with analyze as c:
+            response = await c.post("/api/v1/analyze", json=payload)
+        assert response.status_code == 422, response.text
+        assert response.json()["detail"][0]["loc"][-1] == "text"
+
+    async def test_нестроковый_study_type_даёт_422(self, analyze):
+        async with analyze as c:
+            response = await c.post("/api/v1/analyze", json={"text": "x", "study_type": 5})
+        assert response.status_code == 422, response.text
+
+    async def test_пустое_тело_остаётся_200(self, analyze):
+        """Анализ пустого протокола — штатный случай, а не ошибка."""
         async with analyze as c:
             response = await c.post("/api/v1/analyze", json={})
         assert response.status_code == 200

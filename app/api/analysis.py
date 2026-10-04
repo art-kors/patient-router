@@ -9,9 +9,9 @@
 """
 
 import io
-from typing import Annotated, Any
+from typing import Annotated
 
-from fastapi import APIRouter, Body, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, UploadFile
 from pydantic import BaseModel, Field
 
 from app.services.decision import DecisionEngine
@@ -50,6 +50,18 @@ class TriggerMatchOut(BaseModel):
     version: int = 1
 
 
+class AnalyzeRequest(BaseModel):
+    """Тело POST /analyze.
+
+    Типы проверяет Pydantic, а не код эндпоинта: нестроковый text должен
+    давать 422 с понятным сообщением, а не 500 из глубины экстрактора.
+    Оба поля необязательны — пустой протокол разбирается вхолостую.
+    """
+
+    text: str = Field(default="", description="Текст протокола")
+    study_type: str | None = Field(default=None, description="Тип исследования")
+
+
 class AnalyzeResponse(BaseModel):
     """Ответ анализа: что нашли и что с этим делать."""
 
@@ -61,10 +73,18 @@ class AnalyzeResponse(BaseModel):
     matches: list[TriggerMatchOut]
 
     route_would_be_created: bool = Field(
-        description="Создался бы маршрут (true) или протокол признан нормой (false)"
+        description=(
+            "Создался бы маршрут (true) или протокол признан нормой (false). "
+            "При экстренной находке всегда false: маршрут не создаётся, "
+            "система эскалирует персоналу"
+        )
     )
     winning_trigger: str | None = Field(
-        description="Триггер, по которому создаётся маршрут. None — норма"
+        description=(
+            "Триггер, по которому создаётся маршрут. None — норма. "
+            "При экстренной находке сработавший триггер здесь остаётся "
+            "для объяснения, но маршрут по нему НЕ создаётся — см. is_emergency"
+        )
     )
     specialty: str | None = Field(description="Кого вызовем: профиль специалиста")
     potential_route: str | None = None
@@ -87,15 +107,13 @@ class AnalyzeResponse(BaseModel):
     response_model=AnalyzeResponse,
     summary="Разобрать протокол и объяснить решение",
 )
-async def analyze_text(payload: Annotated[dict[str, Any], Body()]) -> AnalyzeResponse:
+async def analyze_text(payload: AnalyzeRequest) -> AnalyzeResponse:
     """Анализ текста протокола.
 
     Не меняет состояние системы: ни маршрута, ни уведомлений.
     Нужен для демонстрации объяснимости и для отладки правил.
     """
-    text = payload.get("text") or ""
-    study_type = payload.get("study_type")
-    return _analyze(text, study_type)
+    return _analyze(payload.text, payload.study_type)
 
 
 @router.post(
@@ -148,6 +166,12 @@ def _analyze(text: str, study_type: str | None) -> AnalyzeResponse:
     )
 
     winner = decision.winner
+    # ТРЕБОВАНИЕ БЕЗОПАСНОСТИ. Экстренная находка не создаёт маршрут:
+    # персонал получает эскалацию, маршрут — нет. Это тот же запрет, что
+    # в routing.create_from_match и в mis._handle_event; предпросмотр обязан
+    # показывать то же решение, иначе он врёт о том, что сделает система.
+    is_emergency = decision.is_emergency
+    route_would_be_created = winner is not None and not is_emergency
 
     return AnalyzeResponse(
         study_type=extraction.meta.study_type,
@@ -169,15 +193,15 @@ def _analyze(text: str, study_type: str | None) -> AnalyzeResponse:
             for f in extraction.findings
         ],
         matches=[TriggerMatchOut(**m.explanation) for m in decision.matches],
-        route_would_be_created=winner is not None,
+        route_would_be_created=route_would_be_created,
         winning_trigger=winner.trigger.display_name if winner else None,
         specialty=winner.trigger.specialty if winner else None,
         potential_route=winner.trigger.potential_route if winner else None,
         target_sla_days=winner.trigger.target_sla_days if winner else None,
-        is_emergency=decision.is_emergency,
+        is_emergency=is_emergency,
         emergency_notice=(
             "Экстренная находка: маршрут не создаётся, персонал уведомляется"
-            if decision.is_emergency
+            if is_emergency
             else None
         ),
         triggered_count=len(decision.fired),
