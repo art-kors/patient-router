@@ -7,7 +7,6 @@ from uuid import uuid4
 
 import docx
 import pytest
-from app.services.anonymization import anonymize
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import MetaData, create_engine, event, select
 from sqlalchemy.orm import Session
@@ -17,6 +16,7 @@ from app.clock import get_clock
 from app.db import get_session
 from app.main import create_app
 from app.models import Appointment, Base, Finding, Patient, Protocol, Study
+from app.services.anonymization import anonymize
 from app.services.mock_mis import MockMisService
 from app.settings import get_settings
 from tests.conftest import auth_headers
