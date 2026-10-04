@@ -34,6 +34,7 @@ dev = [
     "ruff>=0.7.0",
     "mypy>=1.13.0",
     "alembic>=1.14.0",
+    "pyyaml>=6.0.1",
 ]
 
 [build-system]
