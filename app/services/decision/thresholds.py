@@ -46,6 +46,8 @@ _METRIC_LABELS = {
 
 # Порядок сравнения для разных префиксов ограничений.
 _COMPARATORS = {
+    "gt": lambda observed, limit: observed > limit,
+    "lt": lambda observed, limit: observed < limit,
     "min": lambda observed, limit: observed >= limit,
     "max": lambda observed, limit: observed <= limit,
 }
@@ -121,7 +123,9 @@ def supports_threshold(key: str) -> bool:
     Используется в тестах (защита от повторения бага) и в
     matrix.validate() (предупреждение врачу о неподдержанном пороге).
     """
-    return metric_of(key) in _RESOLVERS
+    return metric_of(key) in _RESOLVERS and any(
+        key.startswith(prefix + "_") for prefix in _COMPARATORS
+    )
 
 
 def numeric_thresholds(thresholds: dict) -> list[tuple[str, float]]:
@@ -162,6 +166,7 @@ def evaluate_thresholds(
     region = _conclusion_region(conclusion_text)
     checked: list[str] = []
     skipped: list[str] = []
+    explanations: list[str] = []
 
     for key, limit in limits:
         metric = metric_of(key)
@@ -197,6 +202,11 @@ def evaluate_thresholds(
                 skipped=tuple(skipped),
             )
 
+        explanations.append(
+            f"требуется {requirement}, "
+            f"в протоколе {_number(measured.value)}{_unit(unit)} — сработало"
+        )
+
         if not compare(measured.value, limit):
             return ThresholdOutcome(
                 passed=False,
@@ -206,11 +216,7 @@ def evaluate_thresholds(
                 skipped=tuple(skipped),
             )
 
-    detail = (
-        f"пороги выполнены: {', '.join(f'{k}={_number(v)}' for k, v in limits)}"
-        if limits
-        else "пороги не заданы"
-    )
+    detail = "пороги выполнены: " + "; ".join(explanations)
     return ThresholdOutcome(
         passed=True,
         quote=candidate.quote,
@@ -399,7 +405,7 @@ def _clause(text: str, position: int) -> str:
 
 def _relation(constraint: str, limit: float) -> str:
     """«≥ 70» / «≤ 5» — знак сравнения, как его видит врач."""
-    symbol = "≥" if constraint == "min" else "≤"
+    symbol = {"min": "≥", "max": "≤", "gt": ">", "lt": "<"}[constraint]
     return f"{symbol} {_number(limit)}"
 
 

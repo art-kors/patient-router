@@ -114,7 +114,8 @@ class MatrixStore:
         )
         current = rows.scalar_one_or_none()
         if current is not None:
-            return current
+            # Старые снимки тоже показывают пороги, которые реально проверит движок.
+            return [dict(item, thresholds=_build(item).thresholds) for item in current]
         return [dict(asdict(t), enabled=True) for t in load_triggers(MATRIX_PATH)]
 
     async def save(self, items, author, description):

@@ -7,7 +7,6 @@
 Каждый успешный анализ сохраняет обезличенный журнал для оценки качества.
 """
 
-import io
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
@@ -17,6 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.clock import get_clock
 from app.db import get_session
 from app.services.analytics import record
+from app.services.anonymization import read_docx
 from app.services.decision import DecisionEngine
 from app.services.extraction import get_extractor
 
@@ -149,21 +149,9 @@ async def analyze_upload(
 
 
 def _decode(raw: bytes) -> str:
-    """Достать текст из .docx или .txt.
-
-    Для .docx нужен python-docx; если его нет — честно падаем,
-    а не молча возвращаем пустоту (иначе демо покажет «находок нет»).
-    """
-    if raw[:2] == b"PK":  # zip-сигнатура docx
-        try:
-            import docx  # type: ignore[import-not-found]
-        except ImportError as exc:
-            raise ValueError(
-                "Для .docx нужен пакет python-docx. "
-                "Либо установите его, либо передайте текст в /api/v1/analyze"
-            ) from exc
-        document = docx.Document(io.BytesIO(raw))
-        return "\n".join(p.text for p in document.paragraphs)
+    """Достать текст из .docx, включая таблицы, или .txt без записи исходника."""
+    if raw[:2] == b"PK":
+        return read_docx(raw)
     return raw.decode("utf-8", errors="replace")
 
 

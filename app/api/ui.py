@@ -33,14 +33,24 @@ def pulse():
     return FileResponse(STATIC / "pulse.html")
 
 
+@router.get("/admin", include_in_schema=False)
+def admin():
+    """Настройки правил и оценка качества для администратора."""
+    return FileResponse(STATIC / "admin.html")
+
+
 @router.get("/", include_in_schema=False)
 def index():
-    """Главная страница дашборда."""
+    """Стартовая страница с выбором роли."""
     return FileResponse(STATIC / "index.html")
 
 
 STATIC_FILES = frozenset(
     {
+        "auth.js",
+        "patient.js",
+        "coordinator.js",
+        "coordinator.css",
         "dashboard.js",
         "analytics.js",
         "style.css",
@@ -65,6 +75,7 @@ def static(filename: str):
     path = (STATIC / filename).resolve()
     if (
         not filename
+        or (STATIC / filename).is_symlink()
         or "/" in filename
         or "\\" in filename
         or path.parent != STATIC.resolve()
@@ -74,3 +85,9 @@ def static(filename: str):
     if filename not in STATIC_FILES:
         raise HTTPException(404, "Ресурс не найден")
     return FileResponse(path)
+
+
+@router.get("/coordinator", include_in_schema=False)
+def coordinator():
+    """Рабочее место координатора."""
+    return FileResponse(STATIC / "coordinator.html")

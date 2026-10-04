@@ -9,6 +9,7 @@ from httpx import ASGITransport, AsyncClient
 from app.api.routes import router
 from app.db import get_session
 from app.main import create_app
+from tests.conftest import auth_headers
 
 
 @pytest.fixture
@@ -45,7 +46,7 @@ def test_unfinished_объявлен_до_route_id(routes_app):
 @pytest.mark.parametrize("payload", [{}, {"tactics": ""}, {"tactics": None}])
 async def test_невалидная_тактика_даёт_422(routes_app, payload):
     async with AsyncClient(
-        transport=ASGITransport(app=routes_app), base_url="http://test"
+        transport=ASGITransport(app=routes_app), base_url="http://test", headers=auth_headers()
     ) as client:
         response = await client.post(f"/api/v1/routes/{uuid4()}/tactics", json=payload)
     assert response.status_code == 422
@@ -56,7 +57,7 @@ async def test_невалидная_тактика_даёт_422(routes_app, payl
 @pytest.mark.parametrize("suffix", ["", "/timeline"])
 async def test_неизвестный_маршрут_даёт_404(routes_app, suffix):
     async with AsyncClient(
-        transport=ASGITransport(app=routes_app), base_url="http://test"
+        transport=ASGITransport(app=routes_app), base_url="http://test", headers=auth_headers()
     ) as client:
         response = await client.get(f"/api/v1/routes/{uuid4()}{suffix}")
     assert response.status_code == 404
@@ -81,7 +82,7 @@ def test_таймлайн_в_схеме(routes_app):
 async def test_неизвестное_исследование_даёт_404(routes_app):
     """Создание маршрута проверяет ссылки до обращения к сервисам."""
     async with AsyncClient(
-        transport=ASGITransport(app=routes_app), base_url="http://test"
+        transport=ASGITransport(app=routes_app), base_url="http://test", headers=auth_headers()
     ) as client:
         response = await client.post(
             "/api/v1/routes",
@@ -135,7 +136,7 @@ async def test_дубликат_маршрута_даёт_409(routes_app, monkey
     monkeypatch.setitem(sys.modules, "app.services.routing", routing)
     monkeypatch.setitem(sys.modules, "app.services.timers", timers)
     async with AsyncClient(
-        transport=ASGITransport(app=routes_app), base_url="http://test"
+        transport=ASGITransport(app=routes_app), base_url="http://test", headers=auth_headers()
     ) as client:
         response = await client.post(
             "/api/v1/routes",

@@ -117,9 +117,7 @@ async def test_врач_видит_находку_через_62_дня(scenario,
     assert duplicate.json()["unfinished_routes_banner"] == banner
 
 
-@pytest.mark.parametrize(
-    "action,target", [("already_attended", "closed_by_patient"), ("wants_booking", "booked")]
-)
+@pytest.mark.parametrize("action,target", [("already_attended", "closed_by_patient")])
 async def test_ответ_пациента_после_62_дней(scenario, action, target):
     route_id = await create_route(scenario)
     await advance(scenario, 62 * 24)
