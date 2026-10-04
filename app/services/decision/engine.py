@@ -114,6 +114,10 @@ class DecisionEngine:
     def __init__(self, triggers: list[TriggerDef] | None = None) -> None:
         self._triggers = triggers if triggers is not None else load_triggers()
 
+    def reload(self) -> None:
+        """Атомарно заменить матрицу для следующих решений."""
+        self._triggers = load_triggers()
+
     @property
     def triggers(self) -> list[TriggerDef]:
         return self._triggers
@@ -258,3 +262,39 @@ class DecisionEngine:
             if negative.lower() in haystack:
                 return negative
         return ""
+
+
+def reload_engine() -> list[TriggerDef]:
+    """Применить матрицу и обновить словарный декодер без перезапуска."""
+    triggers = load_triggers()
+    refresh_dictionary(triggers)
+    return triggers
+
+
+def refresh_dictionary(triggers: list[TriggerDef]) -> None:
+    """Согласовать словарный декодер с загруженной редакцией правил."""
+    from app.services.extraction import DictionaryExtractor, get_extractor
+
+    extractor = get_extractor()
+    if isinstance(extractor, DictionaryExtractor):
+        # Движок сопоставляет имя находки с синонимами. Произвольное
+        # название нового правила может не совпадать ни с одним из них.
+        names = {
+            trigger.trigger_id: (
+                trigger.display_name
+                if trigger.matches(trigger.display_name)
+                else trigger.synonyms[0]
+            )
+            for trigger in triggers
+            if trigger.synonyms
+        }
+        extractor._synonyms = [
+            (synonym.lower(), names[trigger.trigger_id])
+            for trigger in triggers
+            for synonym in trigger.synonyms
+        ]
+        extractor._negatives = {
+            names[trigger.trigger_id]: list(trigger.negative_contexts)
+            for trigger in triggers
+            if trigger.synonyms
+        }
