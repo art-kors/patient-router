@@ -102,7 +102,7 @@ flowchart LR
 ### Вариант A: всё в Docker
 
 ```bash
-cp .env.example .env          # необязательно: значения по умолчанию рабочие
+cp .env.example .env          # обязательно: проверьте свободные порты перед запуском
 docker compose up -d --build  # поднимет db + app
 docker compose exec -T app alembic upgrade head
 ```
@@ -113,6 +113,7 @@ docker compose exec -T app alembic upgrade head
 ### Демо для жюри: запуск и загрузка данных
 
 ```bash
+# Если .env ещё нет: cp .env.example .env; выберите свободные порты.
 docker compose --profile demo up -d --build --wait demo
 
 # Передать подготовленные синтетические протоколы из data/demo/protocols.
@@ -125,8 +126,10 @@ docker compose exec -T demo python scripts/seed_demo.py
 Засев выполняется после готовности сервиса и миграций; повторный запуск
 не создаёт дубликатов. Каталог `data/demo` должен быть подготовлен заранее
 (см. раздел «Засев демо-данных для метрик качества»): он не включён в образ.
-Ни `-E`, ни правки `.env`, ни переменных окружения не требуется —
-модельное время включено жёстко в самом compose-файле.
+Модельное время включено жёстко в compose-файле, `sudo -E` для него не нужен.
+Порты задаются явно в `.env` или окружении; пустые и отсутствующие значения
+Compose отклоняет ещё до обращения к Docker. Нужны все четыре переменные
+портов, включая сервисы вне выбранного профиля.
 
 Демо доступно на **http://localhost:8010** (свой порт, чтобы не драться с
 `app` на 8000):
@@ -180,18 +183,39 @@ docker compose --profile dev up dev
 хардкод ронял стенд при любой второй копии каталога или соседнем проекте на
 той же машине (`Conflict. The container name "/pr-db" is already in use`).
 
-Две копии репозитория рядом разводятся именем проекта:
+### Если стенд не поднимается
+
+Проверьте владельца портов, не останавливая чужие контейнеры:
 
 ```bash
-docker compose -p stand-a up -d --build   # контейнеры stand-a-*, том stand-a_pgdata
-docker compose -p stand-b up -d --build   # контейнеры stand-b-*, том stand-b_pgdata
+ss -ltnp '( sport = :8010 or sport = :5433 )'
+docker ps --format 'table {{.Names}}\t{{.Ports}}'
+docker compose --profile demo ps -a
+cid=$(docker compose --profile demo ps -a -q demo)
+[ -z "$cid" ] || docker inspect "$cid" --format '{{json .State}}'
+docker compose logs --tail=100 demo db
 ```
 
-Порты на хосте при этом всё равно нужно развести: `POSTGRES_PORT=5434 APP_PORT=8002
-DEMO_PORT=8012 docker compose -p stand-b up -d --build`.
+При конфликте портов `up` сразу сообщает `port is already allocated`,
+а `.State.Error` сохраняет причину ошибки запуска. У сервисов с публикуемыми портами отключён
+автоматический рестарт: ошибка не превращается в цикл с потерянной сетью.
+Ошибка миграций видна в логах и коде завершения. `/health` проверяет процесс,
+`/ready` проверяет БД и все таблицы/колонки приложения; healthcheck демо
+использует `/ready`, поэтому `--wait` не подтверждает пустую схему.
+
+Второй демо-стенд поднимайте с отдельным именем проекта и свободными портами:
+
+```bash
+POSTGRES_PORT=5434 APP_PORT=8002 DEV_PORT=8003 DEMO_PORT=8012 \
+  docker compose -p stand-b --profile demo up -d --build --wait demo
+curl -f http://localhost:8012/ready
+```
+
+Имя проекта разделяет контейнеры, сеть и том, но не резервирует порты.
+Если выбранные порты заняты, выберите другие; чужие стенды не удаляйте.
 
 Регрессия закрыта тестом `tests/unit/test_compose.py`: он падает, если
-`container_name` или `name:` у тома вернутся.
+`container_name`, `name:` у тома или молчаливые дефолты портов вернутся.
 
 ## Засев демо-данных для метрик качества
 
@@ -257,7 +281,7 @@ curl "http://localhost:8000/api/v1/quality/metrics?split=gold"
 
 ```bash
 curl localhost:8000/health    # живость приложения
-curl localhost:8000/ready     # готовность + связь с БД
+curl localhost:8000/ready     # готовность БД и схемы
 ```
 
 Swagger: <http://localhost:8000/docs>. Порты по умолчанию: приложение — `8000`,
@@ -292,7 +316,7 @@ make check         # lint + test (то же, что делает CI локаль
 | Метод | Путь | Назначение |
 |---|---|---|
 | GET | `/health` | Живость процесса, время, режим часов |
-| GET | `/ready` | `SELECT 1` в БД; 503 без БД |
+| GET | `/ready` | БД и таблицы/колонки схемы; 503 при сбое |
 | GET | `/docs` | Swagger UI (каркас FastAPI) |
 | GET | `/openapi.json` | Спецификация (каркас FastAPI) |
 
