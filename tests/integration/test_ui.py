@@ -57,10 +57,10 @@ PAGE_ELEMENTS = {
         "messages": "div",
         "route-panel": "section",
         "patient-route": "div",
-        "route-actions": "div",
         "unfinished-banner": "section",
-        "patient-select": "select",
-        "load-patient": "button",
+        "protocols": "div",
+        "appointments": "div",
+        "refresh": "button",
     },
     "/doctor": {
         "unfinished-banner": "section",
@@ -104,7 +104,9 @@ async def test_page_contract(client, path):
 async def test_page_resources_and_navigation(client, path):
     """Скрипт запускается через defer, ресурсы доступны, переходы ведут на все страницы."""
     elements = Elements((await client.get(path)).text).elements
-    script = {"/admin": "dashboard.js", "/analytics": "analytics.js"}.get(path, "clinical.js")
+    script = {"/admin": "dashboard.js", "/analytics": "analytics.js", "/patient": "patient.js"}.get(
+        path, "clinical.js"
+    )
     if path != "/":
         assert any(
             tag == "script" and attrs.get("src") == f"/static/{script}" and "defer" in attrs
@@ -118,7 +120,8 @@ async def test_page_resources_and_navigation(client, path):
     assert "/static/style.css" in styles
     if path not in ("/", "/admin", "/analytics"):
         assert "/static/clinical.css" in styles
-    assert set(PAGE_ELEMENTS) <= {attrs.get("href") for tag, attrs in elements if tag == "a"}
+    if path != "/patient":
+        assert set(PAGE_ELEMENTS) <= {attrs.get("href") for tag, attrs in elements if tag == "a"}
     for resource in styles | ({f"/static/{script}"} if path != "/" else set()):
         assert (await client.get(resource)).status_code == 200
 
@@ -230,8 +233,19 @@ async def test_page_orientation(client, path):
 
 
 async def test_role_choices(client):
-    """Старт объясняет все роли и предлагает начать с истории пациента."""
+    """Старт объясняет все роли и предлагает открыть свой кабинет."""
     html = (await client.get("/")).text
     for label in ("Я пациент", "Я врач", "Я координатор", "Я администратор"):
         assert label in html
-    assert "Посмотреть историю пациента" in html
+    assert "Открыть мой кабинет" in html
+    assert "история пациента" not in html.lower()
+
+
+async def test_patient_script_symlink_inside_static_is_rejected(client, tmp_path, monkeypatch):
+    """Ссылка запрещена и тогда, когда её цель находится внутри каталога статики."""
+    from app.api import ui
+
+    (tmp_path / "clinical.js").write_text("Ресурс", encoding="utf-8")
+    (tmp_path / "patient.js").symlink_to(tmp_path / "clinical.js")
+    monkeypatch.setattr(ui, "STATIC", tmp_path)
+    assert (await client.get("/static/patient.js")).status_code == 404

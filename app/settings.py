@@ -1,10 +1,11 @@
 """Конфигурация приложения из переменных окружения."""
 
+import json
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -17,6 +18,18 @@ class Settings(BaseSettings):
     environment: str = "dev"
     debug: bool = True
     log_level: str = "INFO"
+
+    # Параметры существующего демо-входа.
+    auth_secret: str = Field(default="", repr=False)
+    auth_users: Annotated[dict, NoDecode] = Field(default_factory=dict)
+    auth_demo_enabled: bool = True
+    auth_token_ttl: int = Field(default=3600, gt=0)
+
+    @field_validator("auth_users", mode="before")
+    @classmethod
+    def parse_users(cls, value):
+        """Пустая переменная означает отсутствие настроенных пользователей."""
+        return json.loads(value) if isinstance(value, str) and value else value or {}
 
     # --- декодер: модель включается только явно ---
     decoder_mode: Literal["rules", "llm"] = "rules"

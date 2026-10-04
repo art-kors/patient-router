@@ -9,7 +9,7 @@ let busy = false, modelClock = false;
 const date = value => value ? new Date(value).toLocaleString('ru-RU') : 'Дата не назначена';
 function node(tag, text, className) {
   const el = document.createElement(tag);
-  if (text !== undefined) el.textContent = text;
+  if (text !== undefined) el.textContent = presentText(text);
   if (className) el.className = className;
   return el;
 }
@@ -73,7 +73,7 @@ function renderRoute(value) {
   if (value.history?.length) {
     const list = node('ol');
     value.history.forEach(step => list.append(node('li', `${date(step.date)} — ${step.text}`)));
-    el.append(node('h3', 'История плана'), list);
+    el.append(node('h3', 'Пройденные этапы'), list);
   }
   // При нескольких напоминаниях ответ относится к явно выбранному маршруту.
   const ids = banner?.route_ids?.length ? banner.route_ids : [value.route_id];
@@ -82,7 +82,7 @@ function renderRoute(value) {
   if (ids.length > 1) {
     const label = node('label', 'Маршрут для ответа');
     const select = node('select');
-    ids.forEach((id, i) => { const option = node('option', `Напоминание ${i + 1} · ${id}`); option.value = id; select.append(option); });
+    ids.forEach((id, i) => { const option = node('option', `Напоминание ${i + 1}`); option.value = id; select.append(option); });
     select.value = target;
     select.onchange = () => { target = select.value; };
     label.append(select); $('route-actions').append(label);

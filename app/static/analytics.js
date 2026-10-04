@@ -11,7 +11,7 @@ async function api(path, options) {
 }
 function node(tag, text) {
   const element = document.createElement(tag);
-  if (text != null) element.textContent = text;
+  if (text != null) element.textContent = presentText(text);
   return element;
 }
 function table(target, headers, rows) {

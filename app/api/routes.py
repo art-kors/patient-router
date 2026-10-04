@@ -3,12 +3,13 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import scope_filter
 from app.clock import get_clock
 from app.db import get_session
 from app.models import (
@@ -199,6 +200,7 @@ async def create_route(payload: CreateRoute, session: AsyncSession = Depends(get
 
 @router.get("", response_model=RouteList, summary="Список маршрутов")
 async def list_routes(
+    request: Request,
     status: RouteStatus | None = None,
     specialty: str | None = None,
     clinic: str | None = None,
@@ -209,7 +211,7 @@ async def list_routes(
     session: AsyncSession = Depends(get_session),
 ):
     """Фильтрует очередь по кодам профиля и клиники, статусу и срокам."""
-    filters = []
+    filters = scope_filter(request, Route.patient_id)
     if status is not None:
         filters.append(Route.status == status)
     if patient_id is not None:

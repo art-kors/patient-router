@@ -38,6 +38,7 @@ async def client() -> AsyncIterator[AsyncClient]:
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers.update(auth_headers())
         yield ac
 
 
@@ -93,3 +94,17 @@ def analytics_session():
     yield session
     session.sync.close()
     session.bind.dispose()
+
+
+def auth_headers(role="admin", patient_ids=None):
+    """Подписанный вход для тестов API без обхода серверных прав."""
+    import time
+
+    from app.auth import sign
+
+    return {
+        "Authorization": "Bearer "
+        + sign(
+            {"sub": role, "role": role, "patient_ids": patient_ids or [], "exp": time.time() + 3600}
+        )
+    }

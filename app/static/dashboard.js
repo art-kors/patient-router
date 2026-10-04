@@ -2,7 +2,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let active = 'metrics', items = [], selected = null, creating = false;
-function node(tag, text, cls) { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; }
+function node(tag, text, cls) { const e = document.createElement(tag); if (text !== undefined) e.textContent = presentText(text); if (cls) e.className = cls; return e; }
 function status(text, failure = false) { $('status').textContent = text; $('status').className = failure ? 'failure' : ''; }
 async function api(path, method = 'GET', body) {
   const r = await fetch(path, {method, headers: {'Content-Type': 'application/json'}, ...(body === undefined ? {} : {body: JSON.stringify(body)})}).catch(() => { throw new Error('Нет связи с локальным сервером. Проверьте, что он запущен, и нажмите «Обновить».'); });
@@ -13,7 +13,7 @@ async function api(path, method = 'GET', body) {
 function table(target, headers, rows) {
   const t = node('table'), head = node('thead'), tr = node('tr');
   headers.forEach(h => tr.append(node('th', h))); head.append(tr); t.append(head);
-  const body = node('tbody'); rows.forEach(row => { const r = node('tr'); row.forEach(value => { const td = node('td'); value instanceof Node ? td.append(value) : td.textContent = value; r.append(td); }); body.append(r); });
+  const body = node('tbody'); rows.forEach(row => { const r = node('tr'); row.forEach(value => { const td = node('td'); value instanceof Node ? td.append(value) : td.textContent = presentText(value); r.append(td); }); body.append(r); });
   t.append(body); $(target).replaceChildren(rows.length ? t : node('p', 'Данных пока нет. Добавьте проверенные примеры или измените выборку и обновите страницу.'));
 }
 const percent = value => value == null ? 'Пока нечем посчитать' : `${Math.round(value * 100)} из 100`;
@@ -82,6 +82,7 @@ function edit(item, fresh = false) {
     if (field.tagName === 'INPUT') field.type = type;
     if (type === 'checkbox') field.checked = item[key] ?? key === 'enabled';
     else field.value = type === 'list' ? (item[key] || []).join('\n') : type === 'json' ? JSON.stringify(item[key] || {}, null, 2) : item[key] ?? '';
+    if (key === 'potential_route') { field.originalValue = field.value; field.value = presentText(field.value); field.initialDisplay = field.value; }
     if (key === 'trigger_id') { field.readOnly = !fresh; field.required = true; field.pattern = '[a-zA-Z0-9_-]+'; }
     if (key === 'display_name') field.required = true;
     if (type === 'number') { field.min = 1; if (key === 'priority') field.max = 4; field.step = 1; field.required = true; }
@@ -120,7 +121,7 @@ $('refresh').onclick = () => action(refresh); $('split').onchange = () => action
 $('add').onclick = () => edit({target_sla_days: 14, priority: 3, enabled: true}, true);
 $('editor').onsubmit = event => { event.preventDefault(); action(async () => {
   const form = $('editor'), body = {author: form.elements.author.value, description: form.elements.description.value};
-  definitions.forEach(([key, , type]) => { const field = form.elements[key]; body[key] = type === 'checkbox' ? field.checked : type === 'number' ? Number(field.value) : type === 'list' ? field.value.split('\n').map(s => s.trim()).filter(Boolean) : type === 'json' ? JSON.parse(field.value) : field.value; });
+  definitions.forEach(([key, , type]) => { const field = form.elements[key]; body[key] = type === 'checkbox' ? field.checked : type === 'number' ? Number(field.value) : type === 'list' ? field.value.split('\n').map(s => s.trim()).filter(Boolean) : type === 'json' ? JSON.parse(field.value) : key === 'potential_route' && field.value === field.initialDisplay ? field.originalValue : field.value; });
   const id = body.trigger_id; if (!creating) delete body.trigger_id;
   const result = await api(creating ? '/api/v1/admin/triggers' : `/api/v1/admin/triggers/${encodeURIComponent(id)}`, creating ? 'POST' : 'PUT', body);
   await loadTriggers(); edit(items.find(i => i.trigger_id === id)); status(`Версия ${result.version} сохранена и применена. Предупреждений: ${result.warnings.length}.`);

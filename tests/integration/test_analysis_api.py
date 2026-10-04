@@ -7,6 +7,7 @@
 import pytest
 
 from app.main import create_app
+from tests.conftest import auth_headers
 
 # Реальные куски из выданных протоколов хакатона.
 TRIGGERED = """
@@ -56,7 +57,9 @@ def analyze(analytics_session):
 
     app = create_app()
     app.dependency_overrides[get_session] = lambda: analytics_session
-    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+    return AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test", headers=auth_headers()
+    )
 
 
 class TestAnalyzeTriggered:

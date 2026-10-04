@@ -4,7 +4,7 @@ from datetime import date
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import AwareDatetime, BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -77,10 +77,15 @@ def translate_error(exc: Exception) -> HTTPException:
 
 
 @router.get("/patients", response_model=list[PatientOut], summary="Каталог пациентов внешней МИС")
-async def patients(service: Service):
+async def patients(service: Service, request: Request):
     """Показать все документы, включая нормальные исследования."""
     try:
-        return service.catalog()
+        user = getattr(request.state, "user", {"role": "admin"})
+        return [
+            p
+            for p in service.catalog()
+            if user["role"] == "admin" or str(p["patient_id"]) in user.get("patient_ids", [])
+        ]
     except (FileNotFoundError, ValueError) as exc:
         raise translate_error(exc) from exc
 
