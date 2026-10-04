@@ -7,6 +7,7 @@
 
 import ast
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -121,19 +122,22 @@ class TestDevImage:
         )
 
 
-def _local_packages() -> list[str]:
+def _local_packages(repo_root: Path = REPO_ROOT) -> list[str]:
     """Найти замыкание локальных пакетов, импортируемых приложением.
 
     Просматриваем все модули достигнутого пакета: так учитываются и пути,
     вызываемые первым запросом, которые ещё не исполняются при старте.
     Относительные импорты остаются внутри уже достигнутого пакета.
+    Импорты тестов не просматриваем. Стандартную библиотеку и каталоги
+    без Python-кода исключаем. Каталог alembic учитываем намеренно:
+    импортируется сторонняя библиотека, но ей нужны локальные миграции.
     """
     pending = {"app"}
     found: set[str] = set()
     while pending:
         package = pending.pop()
         found.add(package)
-        for source in (REPO_ROOT / package).rglob("*.py"):
+        for source in (repo_root / package).rglob("*.py"):
             tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
             for node in ast.walk(tree):
                 modules: list[str] = []
@@ -143,9 +147,36 @@ def _local_packages() -> list[str]:
                     modules = [node.module]
                 for module in modules:
                     root = module.split(".", 1)[0]
-                    if (REPO_ROOT / root).is_dir() and root not in found:
+                    if (
+                        root not in sys.stdlib_module_names
+                        and root not in found
+                        and (repo_root / root).is_dir()
+                        and any((repo_root / root).rglob("*.py"))
+                    ):
                         pending.add(root)
     return sorted(found)
+
+
+def test_поиск_пакетов_не_зависит_от_внешних_и_тестовых_импортов(tmp_path: Path):
+    """Учитываем локальное замыкание, исключая stdlib, зависимости и тесты."""
+    sources = {
+        "app/main.py": "import json\nimport pytest\nimport assets\n"
+        "def load():\n    from local.adapter import run\n",
+        "local/adapter.py": "import nested\n",
+        "nested/__init__.py": "",
+        "json/__init__.py": "",
+        "unrelated/__init__.py": "",
+        "tests/test_random.py": "import unrelated\n",
+    }
+    for name, content in sources.items():
+        source = tmp_path / name
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text(content, encoding="utf-8")
+    (tmp_path / "assets").mkdir()
+    expected = ["app", "local", "nested"]
+    assert _local_packages(tmp_path) == expected
+    (tmp_path / "tests/test_random.py").write_text("import assets\n", encoding="utf-8")
+    assert _local_packages(tmp_path) == expected
 
 
 def _stages(dockerfile: str) -> dict[str, str]:
