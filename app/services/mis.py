@@ -37,6 +37,7 @@ from app.services.timers import TimerEngine
 ACTOR = "mis"
 
 EVENT_TYPES = {
+    "VisitStarted": "Показать врачу незавершённые маршруты при открытии нового приёма.",
     "StudyProtocolSigned": (
         "Извлечь находки, проверить триггеры и создать маршрут; экстренные находки эскалировать."
     ),
@@ -345,6 +346,10 @@ class MisEventHandler:
                     await self.timers.schedule_route(session, route, definition.target_sla_days)
             result["route_id"] = str(route.id)
 
+    async def _handle_VisitStarted(self, session, event, result):
+        """Зафиксировать открытие приёма; баннер добавляет API без изменения маршрута."""
+        result["status"] = "processed"
+
     async def _handle_StudyProtocolSigned(self, session, event, result):
         await self._analyze(session, event, result)
 
@@ -392,6 +397,13 @@ class MisEventHandler:
         if appointment:
             appointment.visit_status = status
         moved = await self._transition(session, route, target, result)
+        if moved is not None and moved.status == RouteStatus.BOOKED:
+            await self.timers.cancel_for_route(session, route.id)
+        if moved is not None and moved.status in {
+            RouteStatus.NO_SHOW,
+            RouteStatus.BOOKING_REQUIRED,
+        }:
+            await self.timers.schedule_return(session, route)
         if moved is not None and moved.status == RouteStatus.VISIT_DONE:
             await self._transition(session, moved, "decision_pending", result)
 
@@ -399,7 +411,7 @@ class MisEventHandler:
         await self._appointment(session, event, result, "booked", "booked")
 
     async def _handle_AppointmentCancelled(self, session, event, result):
-        await self._appointment(session, event, result, "cancelled", "awaiting_booking")
+        await self._appointment(session, event, result, "cancelled", "booking_required")
 
     async def _handle_VisitCompleted(self, session, event, result):
         await self._appointment(session, event, result, "completed", "visit_done")

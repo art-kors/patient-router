@@ -21,6 +21,10 @@ from app.services.timers import Effect
 from app.settings import get_settings
 
 DEFAULT_TEMPLATES = {
+    "notify_no_show": (
+        "{{пациент}}, приём не состоялся. Пожалуйста, выберите новую дату "
+        "консультации в {{учреждение}}. Мы поможем вам перезаписаться."
+    ),
     "notify_initial": (
         "{{пациент}}, по результатам УЗИ рекомендуем консультацию специалиста. "
         "Пожалуйста, запишитесь на приём в {{учреждение}}. Мы поможем с записью."
@@ -89,7 +93,8 @@ class NotificationService:
         с типом escalate и повышенным приоритетом. Имя пациента отсутствует
         в обезличенной модели: демонстратор может передать его через context.
         Каждый вызов означает отдельную доставку; повторную обработку таймера
-        предотвращает TimerEngine.fire. Статус маршрута здесь не меняется.
+        предотвращает TimerEngine.fire. Первое уведомление запускает ожидание
+        записи, а эффект закрытия завершает исчерпанную цепочку контактов.
         """
         if effect.kind not in {"notification", "task", "escalate", "close_route", "followup"}:
             raise ValueError("Неизвестный вид эффекта")
@@ -99,6 +104,25 @@ class NotificationService:
         route = await session.get(Route, effect.route_id)
         if route is None:
             raise ValueError("Маршрут не найден")
+        if effect.kind == "close_route" and route.status in {
+            "notified",
+            "awaiting_booking",
+            "booking_required",
+            "no_show",
+        }:
+            from app.services.routing import RoutingService
+
+            await RoutingService().close(
+                session, route.id, "not_realized", "timer", "Запись не подтверждена за 30 дней"
+            )
+        if effect.timer_type.value == "notify_initial" and route.status == "created":
+            from app.services.routing import RoutingService
+
+            routing = RoutingService()
+            await routing.transition(session, route.id, "notified", "timer", "Первое уведомление")
+            await routing.transition(
+                session, route.id, "awaiting_booking", "timer", "Ожидание записи пациента"
+            )
         appointment = await session.scalar(
             select(Appointment)
             .where(Appointment.route_id == route.id, Appointment.visit_status == "booked")
@@ -127,6 +151,8 @@ class NotificationService:
         if context:
             values.update(context)
         code = effect.template_code or effect.timer_type.value
+        if code == "notify_initial" and route.status in {"no_show", "booking_required"}:
+            code = "notify_no_show"
         if code not in self.templates:
             raise ValueError(f"Шаблон не найден: {code}")
         body = render_message(self.templates[code], values)

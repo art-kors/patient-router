@@ -34,7 +34,7 @@ def test_transition_matrix():
     for status in RouteStatus:
         targets = allowed_transitions(status)
         assert targets <= set(TRANSITIONS)
-        assert bool(targets) == (status not in TERMINAL_STATUSES)
+        assert bool(targets) == (status not in TERMINAL_STATUSES or status == "route_not_realized")
 
 
 @pytest.mark.parametrize("status", ["created", "notified", "awaiting_booking", "booked"])
@@ -52,7 +52,7 @@ async def test_impossible_transition():
     session.flush.assert_not_awaited()
 
 
-@pytest.mark.parametrize("status", sorted(TERMINAL_STATUSES))
+@pytest.mark.parametrize("status", sorted(TERMINAL_STATUSES - {"route_not_realized"}))
 async def test_terminal_status_has_no_exit(status):
     route = Route(id=uuid4(), status=status)
     with pytest.raises(RoutingTransitionError):
@@ -238,3 +238,8 @@ async def test_контроль_и_отмена_тактики_не_требую
     result = await RoutingService().transition(session, route.id, target, "система", "Основание")
 
     assert str(result.status) == target
+
+
+def test_нереализованный_маршрут_возобновляется_только_ответом_пациента():
+    """Исчерпание контактов не означает, что клиническая рекомендация выполнена."""
+    assert allowed_transitions("route_not_realized") == {"booked", "closed_by_patient"}

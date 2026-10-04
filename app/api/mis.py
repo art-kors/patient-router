@@ -66,6 +66,13 @@ async def receive_event(
                 ),
             },
         ) from exc
+    if event.event_type in {"VisitStarted", "StudyProtocolSigned"} and event.subject.patient_id:
+        from app.services.banners import unfinished_banner
+
+        result["unfinished_routes_banner"] = await unfinished_banner(
+            session, event.subject.patient_id
+        )
+        result["has_unfinished_routes"] = result["unfinished_routes_banner"]["visible"]
     await session.commit()
     if result["duplicate"]:
         response.status_code = 200

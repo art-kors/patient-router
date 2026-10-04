@@ -76,6 +76,13 @@ class TimerEngine:
             route.created_at = get_clock().now()
         return await self._schedule(session, route, route.created_at, schedule)
 
+    async def schedule_return(self, session: AsyncSession, route: Route) -> list[Timer]:
+        """После несостоявшегося приёма начать новую цепочку с контакта через 45 минут."""
+        await self.cancel_for_route(session, route.id)
+        schedule = escalation_schedule(14)
+        schedule[0] = (TimerType.NOTIFY_INITIAL, 0.75, "notify_initial")
+        return await self._schedule(session, route, get_clock().now(), schedule)
+
     async def schedule_hospitalization(self, session: AsyncSession, route: Route) -> list[Timer]:
         """Дать стационару полный срок контроля независимо от возраста маршрута.
 
