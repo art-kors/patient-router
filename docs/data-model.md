@@ -7,7 +7,7 @@
 > создана внутри `create_table` как `UniqueConstraint`). Схема применяется
 > командой `alembic upgrade head`.
 >
-> Числа сверены с кодом на `d91ff1e`: 20 вхождений `__tablename__` в
+> Числа сверены с кодом на `main`: 20 вхождений `__tablename__` в
 > `app/models.py` и 20 вызовов `op.create_table` в миграциях.
 
 Связано: [Архитектура](architecture.md) · [API](api.md) · [Матрица маршрутизации](routing-matrix.md)

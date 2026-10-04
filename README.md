@@ -367,7 +367,7 @@ curl -X POST localhost:8000/api/v1/demo/clock/advance \
 ## 5. Тесты
 
 ```bash
-make test       # все тесты с покрытием (311 passed, 1 skipped)
+make test       # все тесты с покрытием
 make test-unit  # только юнит-тесты, БД не нужна
 make cov        # HTML-отчёт → htmlcov/index.html
 make check      # lint + test
@@ -379,7 +379,9 @@ make check      # lint + test
 uv run pytest --no-cov
 ```
 
-Текущее состояние: **311 passed, 1 skipped**. Юнит-тесты не требуют БД.
+Актуальное число тестов смотрите в выводе `pytest`: набор пополняется, и
+зафиксированная цифра в документации разъезжалась бы с кодом при первом же
+изменении. Юнит-тесты не требуют БД.
 Интеграционные тесты помечены маркером `integration` и пропускаются без
 `TEST_DATABASE_URL`.
 
