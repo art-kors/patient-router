@@ -29,7 +29,7 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
       TZ: ${TZ:-Europe/Moscow}
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "${POSTGRES_PORT:?Задайте POSTGRES_PORT явно: выберите свободный порт в .env или окружении}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       # init-скрипты НЕ подключены: БД поднимается пустой.
@@ -40,7 +40,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-    restart: unless-stopped
+    # Ошибка запуска остаётся видимой; повторный запуск выполняется явно.
+    restart: "no"
 
   app:
     build:
@@ -58,12 +59,13 @@ services:
       USE_MODEL_CLOCK: ${USE_MODEL_CLOCK:-false}
       TZ: ${TZ:-Europe/Moscow}
     ports:
-      - "${APP_PORT:-8000}:8000"
+      - "${APP_PORT:?Задайте APP_PORT явно: выберите свободный порт в .env или окружении}:8000"
     depends_on:
       db:
         # ждём не просто старта, а успешного pg_isready
         condition: service_healthy
-    restart: unless-stopped
+    # Ошибка запуска остаётся видимой; повторный запуск выполняется явно.
+    restart: "no"
 
   # ── demo: прод-образ + модельное время, одна команда ──────
   #
@@ -72,7 +74,7 @@ services:
   # (env_reset), поэтому `sudo -E docker compose up` был единственным
   # способом включить USE_MODEL_CLOCK, и обычный `docker compose up` давал
   # 409 CLOCK_NOT_MOCK. Здесь значение жёстко задано в compose, а порт
-  # свой (8010), чтобы не драться с app на 8000.
+  # задаётся явно через DEMO_PORT и должен быть свободен.
   #
   # Единственный сервис, который сам накатывает миграции при старте:
   # это одноразовый стенд, иначе жюри получит 500 на первом же
@@ -102,11 +104,18 @@ services:
         alembic upgrade head
         exec uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
-      - "${DEMO_PORT:-8010}:8000"
+      - "${DEMO_PORT:?Задайте DEMO_PORT явно: выберите свободный порт в .env или окружении}:8000"
     depends_on:
       db:
         condition: service_healthy
-    restart: unless-stopped
+    # Ошибка привязки порта или миграций остаётся в статусе, без рестарт-цикла.
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/ready"]
+      interval: 2s
+      timeout: 5s
+      retries: 1
+      start_period: 0s
 
   # ── dev: то же приложение, но с hot reload ───────────────
   dev:
@@ -128,7 +137,7 @@ services:
     ports:
       # свой порт: при `docker compose --profile dev up` поднимается и app,
       # иначе оба бьются за 8000 и стенд не поднимается
-      - "${DEV_PORT:-8001}:8000"
+      - "${DEV_PORT:?Задайте DEV_PORT явно: выберите свободный порт в .env или окружении}:8000"
     volumes:
       # исходники монтируются, зависимости живут в образе
       - ./app:/app/app
@@ -140,7 +149,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    restart: unless-stopped
+    # Ошибка запуска остаётся видимой; повторный запуск выполняется явно.
+    restart: "no"
 
 volumes:
   # без name: том называется <проект>_pgdata и не конфликтует с чужими стендами

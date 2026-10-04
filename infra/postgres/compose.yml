@@ -30,7 +30,7 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
       TZ: ${TZ:-Europe/Moscow}
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "${POSTGRES_PORT:?Задайте POSTGRES_PORT явно: выберите свободный порт в .env или окружении}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       # ↑ персистентность: переживает пересоздание контейнера
@@ -42,7 +42,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-    restart: unless-stopped
+    # Ошибка запуска остаётся видимой; повторный запуск выполняется явно.
+    restart: "no"
 
   # ────────────────────────────────────────────────────────────
   # Одноразовый сервис: применить init-скрипты к уже существующей БД
