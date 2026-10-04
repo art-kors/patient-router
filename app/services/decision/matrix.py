@@ -78,6 +78,12 @@ def load_triggers(path: Path | None = None) -> list[TriggerDef]:
     Намеренно строго: лучше не стартовать, чем маршрутизировать
     пациентов по неполной матрице.
     """
+    if path is None:
+        from app.services.decision.matrix_store import database_triggers
+
+        stored = database_triggers()
+        if stored is not None:
+            return stored
     target = Path(path) if path else MATRIX_PATH
     if not target.exists():
         raise MatrixError(

@@ -130,7 +130,9 @@ async def _evaluate(samples, split):
         raise HTTPException(503, "Протоколы исследований недоступны для оценки качества") from exc
     by_id = {str(study.id): study for study in studies}
     engine = DecisionEngine()
-    known = {trigger.trigger_id for trigger in engine.triggers}
+    # Отключённое правило остаётся известным разметке: отсутствие
+    # срабатывания считается FN/TN, а не повреждением данных.
+    known = {trigger.trigger_id for trigger in _quality_triggers()}
     results = []
     for study_id, labels in grouped.items():
         study = by_id.get(str(UUID(study_id)))
@@ -177,11 +179,16 @@ async def confusion(samples: Samples, split: Split = "all") -> dict:
 
 @router.get("/errors")
 async def errors(
-    samples: Samples, split: Split = "all", limit: Annotated[int, Query(ge=0)] = 50
+    samples: Samples,
+    split: Split = "all",
+    limit: Annotated[int, Query(ge=0)] = 50,
+    trigger_id: str | None = None,
 ) -> list[dict]:
     """Расхождения с цитатами, ограниченные общим лимитом."""
     result = []
     for predictions, labels in await _evaluate(samples, split):
+        if trigger_id is not None:
+            labels = [sample for sample in labels if sample.trigger_id == trigger_id]
         result.extend(_errors(predictions, labels, limit - len(result)))
     return result
 
@@ -217,3 +224,82 @@ def coverage(
         )
     result = quality.coverage(triggers, samples)
     return CoverageOut(**result, labeled_samples=len(samples), available=True)
+
+
+def _quality_triggers():
+    """Для оценки нужны также отключённые правила с сохранённой разметкой."""
+    from app.services.decision.matrix_store import database_triggers
+
+    stored = database_triggers(include_disabled=True)
+    return stored if stored is not None else load_triggers()
+
+
+@router.get("/metrics/by-trigger")
+async def metrics_by_trigger(samples: Samples, split: Split = "all") -> list[dict]:
+    """Метрики каждого правила; available=false означает отсутствие разметки."""
+    evaluated = await _evaluate(samples, split)
+    result = []
+    active_ids = {trigger.trigger_id for trigger in load_triggers()}
+    for trigger in _quality_triggers():
+        counts = dict.fromkeys(("tp", "fp", "fn", "tn"), 0)
+        for predictions, labels in evaluated:
+            selected = [label for label in labels if label.trigger_id == trigger.trigger_id]
+            for key, value in _confusion(predictions, selected).items():
+                counts[key] += value
+        metric = quality.QualityMetrics(**counts)
+        result.append(
+            {
+                "trigger_id": trigger.trigger_id,
+                "display_name": trigger.display_name,
+                **{key: getattr(metric, key) for key in MetricsOut.model_fields if key != "split"},
+                "split": split,
+                "available": metric.n_samples > 0,
+                "enabled": trigger.trigger_id in active_ids,
+            }
+        )
+    return result
+
+
+@router.get("/metrics/timeline")
+async def metrics_timeline(samples: Samples, split: Split = "all") -> dict:
+    """Зафиксировать текущую оценку и вернуть историю снимков по датам.
+
+    Исторические снимки не пересчитываются новым декодером. Дата снимка —
+    дата оценки, а не дата исследования. Без успешной оценки снимок не пишется.
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import insert
+
+    from app.db import SessionFactory
+    from app.services.decision.matrix_store import MatrixStore, snapshots
+
+    try:
+        async with SessionFactory() as session:
+            store = MatrixStore(session)
+            await store.prepare()
+            # Блокировка конфигурации связывает оценку с точной версией.
+            history = await store.history()
+            current = await metrics(samples, split)
+            await session.execute(
+                insert(snapshots).values(
+                    created_at=datetime.now(UTC),
+                    split=split,
+                    matrix_version=history[0]["version"] if history else 1,
+                    decoder=get_extractor().name,
+                    metrics=current.model_dump(),
+                )
+            )
+            await session.commit()
+            rows = await session.execute(
+                select(snapshots)
+                .where(snapshots.c.split == split)
+                .order_by(snapshots.c.created_at.desc())
+                .limit(100)
+            )
+            return {
+                "points": [dict(row) for row in reversed(list(rows.mappings()))],
+                "message": "Снимки оценок по времени; сохраняются при обновлении дашборда",
+            }
+    except (SQLAlchemyError, OSError) as exc:
+        raise HTTPException(503, "История метрик недоступна: нет соединения с БД") from exc
