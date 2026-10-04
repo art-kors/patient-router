@@ -18,24 +18,25 @@ config/routing_matrix.json и НЕ ИСПОЛЬЗОВАЛ их: поле self._n
   5. отрицание чужого органа не гасит находку другого;
   6. у подавленной находки остаётся дословная цитата.
 
-Матрица настоящая (config/routing_matrix.json) — тест должен ломаться
-вместе с конфигом, иначе он ничего не защищает.
+Исторические сценарии проверяются по неизменяемой исходной матрице.
+Сохранность отрицаний новой матрицы проверяется в test_clinical_matrix.py.
 """
 
 import pytest
 
 from app.services.decision import DecisionEngine, load_triggers
-from app.services.extraction import get_extractor
+from app.services.extraction import DictionaryExtractor
+from scripts.import_clinical_matrix import LEGACY_PATH
 
 
 @pytest.fixture(scope="module")
 def extractor():
-    return get_extractor()
+    return DictionaryExtractor(LEGACY_PATH)
 
 
 @pytest.fixture(scope="module")
 def engine():
-    return DecisionEngine(load_triggers())
+    return DecisionEngine(load_triggers(LEGACY_PATH))
 
 
 def match_of(engine, extractor, text, trigger_id, study_type=None):
@@ -135,7 +136,7 @@ class TestNegativeContextsAreUsed:
         """Поле загружено и не пустое — иначе это снова мёртвый код."""
         loaded = getattr(extractor, "_negatives", {})
         assert loaded, "negative_contexts не загружены"
-        for trigger in load_triggers():
+        for trigger in load_triggers(LEGACY_PATH):
             assert loaded.get(trigger.display_name), (
                 f"у триггера {trigger.trigger_id} нет загруженных отрицаний, "
                 f"хотя в матрице их {len(trigger.negative_contexts)}"

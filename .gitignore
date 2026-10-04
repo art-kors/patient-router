@@ -10,10 +10,13 @@ __pycache__/
 venv/
 *.egg-info/
 
-# данные хакатона: протоколы и разметка НЕ публикуются (требование кейса)
+# Исходные данные хакатона не публикуются; демо-разметка входит в поставку.
 data/raw/
 data/protocols/
-data/labeled/
+data/labeled/*
+!data/labeled/labeled.json
+!data/labeled/README.md
+!data/labeled/protocols.manifest
 *.docx
 *.pdf
 !docs/**/*.pdf

@@ -198,6 +198,19 @@ class TestSafety:
 
 
 class TestEmergency:
+    @pytest.fixture(autouse=True)
+    def emergency_matrix(self, monkeypatch):
+        """Эскалацию проверяем на историческом правиле с emergency_flag=true."""
+        from app.api import analysis
+        from app.services.decision import DecisionEngine, load_triggers
+        from app.services.extraction import DictionaryExtractor
+        from scripts.import_clinical_matrix import LEGACY_PATH
+
+        monkeypatch.setattr(
+            analysis, "DecisionEngine", lambda: DecisionEngine(load_triggers(LEGACY_PATH))
+        )
+        monkeypatch.setattr(analysis, "get_extractor", lambda: DictionaryExtractor(LEGACY_PATH))
+
     """ЭКСТРЕННОЕ: маршрут не создаётся, персонал получает эскалацию.
 
     Тот же запрет, что в routing.create_from_match: emergency_flag=true

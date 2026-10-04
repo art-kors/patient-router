@@ -65,6 +65,11 @@ const definitions = [
 function edit(item, fresh = false) {
   creating = fresh; selected = item.trigger_id; $('editor').hidden = false; $('disable').hidden = fresh;
   $('editor-title').textContent = fresh ? 'Новый триггер' : item.display_name; $('fields').replaceChildren();
+  const origin = item.provenance === 'clinician' ? 'Медицинский специалист' : 'Проектная гипотеза';
+  $('fields').append(node('p', `Источник: ${origin}. Условия врача: ${item.threshold_text || 'не заданы'}`));
+  if (item.threshold_text) $('fields').append(node('p', 'Текстовые условия и обязательность атрибутов требуют проверки специалистом: движок их автоматически не проверяет.'));
+  if (item.required_attributes?.length) $('fields').append(node('p', `Атрибуты: ${item.required_attributes.join(', ')}`));
+  if (item.evidence_phrases?.length) $('fields').append(node('p', `Фразы-доказательства: ${item.evidence_phrases.join('; ')}`));
   definitions.forEach(([key, title, type]) => {
     const label = node('label', title); const field = node(type === 'list' || type === 'json' ? 'textarea' : 'input');
     field.name = key;
@@ -81,7 +86,7 @@ function edit(item, fresh = false) {
 }
 async function loadTriggers() {
   items = await api('/api/v1/admin/triggers'); $('trigger-list').replaceChildren();
-  items.forEach(item => { const b = node('button', `${item.enabled === false ? '○' : '●'} ${item.display_name}`); b.onclick = () => edit(item); $('trigger-list').append(b); });
+  items.forEach(item => { const b = node('button', `${item.enabled === false ? '○' : '●'} ${item.display_name} [${item.provenance === 'clinician' ? 'Врач' : 'Проект'}]`); b.onclick = () => edit(item); $('trigger-list').append(b); });
   const validation = await api('/api/v1/admin/validate');
   $('warnings').replaceChildren(...(validation.warnings.length ? validation.warnings : ['Предупреждений нет.']).map(w => node('li', w)));
 }

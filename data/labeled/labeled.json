@@ -1,0 +1,1226 @@
+[
+  {
+    "study_id": "demo_gynecology_01",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_01",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_01",
+    "trigger_id": "ovarian_cyst",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_01",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_02",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_02",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_02",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_02",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_03",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_03",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_03",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_03",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_04",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_04",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_04",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_04",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_05",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_05",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_05",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_05",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_06",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_06",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_06",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_06",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_07",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_07",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_07",
+    "trigger_id": "ovarian_cyst",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_07",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_08",
+    "trigger_id": "endometrial_polyp",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_08",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_08",
+    "trigger_id": "ovarian_cyst",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_08",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_09",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_09",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_09",
+    "trigger_id": "ovarian_cyst",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_09",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_10",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_10",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_10",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_10",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_11",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_11",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_11",
+    "trigger_id": "ovarian_cyst",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_11",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_12",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_12",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_12",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_12",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_13",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_13",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_13",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_13",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_14",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_14",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_14",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_14",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_15",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_15",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_15",
+    "trigger_id": "ovarian_cyst",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_15",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_16",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_16",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_16",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_16",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_17",
+    "trigger_id": "endometrial_polyp",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_17",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_17",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_17",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_18",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_18",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_18",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_18",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_19",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_19",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_19",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_19",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_20",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_20",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_20",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_20",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_21",
+    "trigger_id": "endometrial_polyp",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_21",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_21",
+    "trigger_id": "ovarian_cyst",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_21",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_22",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_22",
+    "trigger_id": "fibroid_uterus",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_22",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_22",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_23",
+    "trigger_id": "endometrial_polyp",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_23",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_23",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_23",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_24",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_24",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_24",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_24",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_25",
+    "trigger_id": "endometrial_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_25",
+    "trigger_id": "fibroid_uterus",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_25",
+    "trigger_id": "ovarian_cyst",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_gynecology_25",
+    "trigger_id": "submucosal_fibroid",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_01",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_01",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_01",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_02",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_02",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_02",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_03",
+    "trigger_id": "cholelithiasis",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_03",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_03",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_04",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_04",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_04",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_05",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_05",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_05",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_06",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_06",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_06",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_07",
+    "trigger_id": "cholelithiasis",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_07",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_07",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_08",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_08",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_08",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_09",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_09",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_09",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_10",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_10",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_10",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_11",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_11",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_11",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_12",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_12",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_12",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_13",
+    "trigger_id": "cholelithiasis",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_13",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_13",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_14",
+    "trigger_id": "cholelithiasis",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_14",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_14",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_15",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_15",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_15",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_16",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_16",
+    "trigger_id": "gallbladder_polyp",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_16",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_17",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_17",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_17",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_18",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_18",
+    "trigger_id": "gallbladder_polyp",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_18",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_19",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_19",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_19",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_20",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_20",
+    "trigger_id": "gallbladder_polyp",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_20",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_21",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_21",
+    "trigger_id": "gallbladder_polyp",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_21",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_22",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_22",
+    "trigger_id": "gallbladder_polyp",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_22",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_23",
+    "trigger_id": "cholelithiasis",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_23",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_23",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_24",
+    "trigger_id": "cholelithiasis",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_24",
+    "trigger_id": "gallbladder_polyp",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_24",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_25",
+    "trigger_id": "cholelithiasis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_25",
+    "trigger_id": "gallbladder_polyp",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_abdomen_25",
+    "trigger_id": "hydronephrosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_breast_01",
+    "trigger_id": "breast_birads_3_5",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_breast_02",
+    "trigger_id": "breast_birads_3_5",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_breast_03",
+    "trigger_id": "breast_birads_3_5",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_breast_04",
+    "trigger_id": "breast_birads_3_5",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_breast_05",
+    "trigger_id": "breast_birads_3_5",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_breast_06",
+    "trigger_id": "breast_birads_3_5",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_breast_07",
+    "trigger_id": "breast_birads_3_5",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_breast_08",
+    "trigger_id": "breast_birads_3_5",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_breast_09",
+    "trigger_id": "breast_birads_3_5",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_breast_10",
+    "trigger_id": "breast_birads_3_5",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_thyroid_01",
+    "trigger_id": "thyroid_nodule",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_thyroid_02",
+    "trigger_id": "thyroid_nodule",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_thyroid_03",
+    "trigger_id": "thyroid_nodule",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_thyroid_04",
+    "trigger_id": "thyroid_nodule",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_thyroid_05",
+    "trigger_id": "thyroid_nodule",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_thyroid_06",
+    "trigger_id": "thyroid_nodule",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_thyroid_07",
+    "trigger_id": "thyroid_nodule",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_thyroid_08",
+    "trigger_id": "thyroid_nodule",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_thyroid_09",
+    "trigger_id": "thyroid_nodule",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_thyroid_10",
+    "trigger_id": "thyroid_nodule",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_lower_limb_01",
+    "trigger_id": "lower_limb_stenosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_lower_limb_02",
+    "trigger_id": "lower_limb_stenosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_lower_limb_03",
+    "trigger_id": "lower_limb_stenosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_lower_limb_04",
+    "trigger_id": "lower_limb_stenosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_lower_limb_05",
+    "trigger_id": "lower_limb_stenosis",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_lower_limb_06",
+    "trigger_id": "lower_limb_stenosis",
+    "label": false,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_lower_limb_07",
+    "trigger_id": "lower_limb_stenosis",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_lower_limb_08",
+    "trigger_id": "lower_limb_stenosis",
+    "label": true,
+    "split": "gold"
+  },
+  {
+    "study_id": "demo_lower_limb_09",
+    "trigger_id": "lower_limb_stenosis",
+    "label": false,
+    "split": "gold"
+  }
+]
