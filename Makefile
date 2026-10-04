@@ -60,6 +60,14 @@ up: ## Поднять БД + приложение
 down: ## Остановить стек
 	docker compose down
 
+.PHONY: demo
+demo: ## Поднять демо с модельным часом (порт 8010, без -E и правки .env)
+	docker compose --profile demo up -d demo
+
+.PHONY: demo-down
+demo-down: ## Остановить демо-сервис
+	docker compose --profile demo stop demo
+
 .PHONY: clean
 clean: ## Остановить стек и удалить volume с данными
 	docker compose down -v

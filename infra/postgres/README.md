@@ -86,11 +86,18 @@ docker compose --profile tools run --rm db-init
 ## Полный сброс
 
 ```bash
-docker compose down -v      # -v удаляет volume pr_pgdata
+docker compose down -v      # -v удаляет volume <проект>_pgdata
 docker compose up -d
 ```
 
 > ⚠️ `-v` удаляет все данные безвозвратно. На боевой среде не выполнять.
+
+> [!note] Имен контейнеров и тома в этом файле нет намеренно
+> Compose называет их `<проект>-<сервис>-1` и `<проект>_pgdata`. Раньше здесь
+> стояли `container_name: pr-db` и `name: pr_pgdata`, и стенд падал рядом с
+> любой другой копией проекта (`The container name "/pr-db" is already in use`).
+> Связь `db-init` → `db` идёт по имени **сервиса** в сети compose, поэтому
+> `container_name` ей не был нужен.
 
 ## Переменные окружения
 

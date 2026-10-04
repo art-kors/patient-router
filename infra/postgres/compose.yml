@@ -1,7 +1,27 @@
+# ────────────────────────────────────────────────────────────
+# patient-router · отдельный стенд только для БД
+#
+#   cd infra/postgres && docker compose up -d
+#
+# Это НЕ продолжение корневого docker-compose.yaml, а самостоятельный
+# стенд: он поднимает БД с эталонной схемой и сидами из ./init.
+# Корневой compose поднимает пустую БД, которую накатывают миграциями.
+#
+# ИМЕНА КОНТЕЙНЕРОВ И ТОМОВ
+# ─────────────────────────
+# Намеренно НЕТ container_name и верхнеуровневого name: у тома.
+# Compose даёт контейнерам имена <проект>-<сервис>-1, а тому —
+# <проект>_pgdata, где проект — имя каталога (или -p). Хардкод рушил
+# стенд при любой второй копии:
+#   Conflict. The container name "/pr-db" is already in use
+#   WARN volume "pr_pgdata" already exists but was created for project ...
+# Связь db-init → db идёт по имени СЕРВИСА (db) внутри сети compose,
+# поэтому container_name ей и не был нужен.
+# ────────────────────────────────────────────────────────────
+
 services:
   db:
     image: postgres:16-alpine
-    container_name: pr-db
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-patient_router}
       POSTGRES_USER: ${POSTGRES_USER:-pr}
@@ -27,11 +47,10 @@ services:
   # ────────────────────────────────────────────────────────────
   # Одноразовый сервис: применить init-скрипты к уже существующей БД
   # Нужен, когда volume уже инициализирован, а скрипты изменились:
-  #   docker compose run --rm db-init
+  #   docker compose --profile tools run --rm db-init
   # ────────────────────────────────────────────────────────────
   db-init:
     image: postgres:16-alpine
-    container_name: pr-db-init
     depends_on:
       db:
         condition: service_healthy
@@ -53,5 +72,5 @@ services:
     restart: "no"
 
 volumes:
+  # без name: том называется <проект>_pgdata
   pgdata:
-    name: pr_pgdata

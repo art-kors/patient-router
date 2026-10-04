@@ -110,6 +110,52 @@ docker compose exec -T app alembic upgrade head
 > `docker compose up` **не** применяет миграции. Это осознанно: на боевой среде
 > схема меняется явно, а не при старте контейнера.
 
+### Демо для жюри: запуск и загрузка данных
+
+```bash
+docker compose --profile demo up -d --build --wait demo
+
+# Передать подготовленные синтетические протоколы из data/demo/protocols.
+docker compose exec -T --user root demo mkdir -p /app/data
+docker compose cp ./data/demo demo:/app/data/demo
+docker compose exec -T --user root demo chown -R appuser:appuser /app/data
+docker compose exec -T demo python scripts/seed_demo.py
+```
+
+Засев выполняется после готовности сервиса и миграций; повторный запуск
+не создаёт дубликатов. Каталог `data/demo` должен быть подготовлен заранее
+(см. раздел «Засев демо-данных для метрик качества»): он не включён в образ.
+Ни `-E`, ни правки `.env`, ни переменных окружения не требуется —
+модельное время включено жёстко в самом compose-файле.
+
+Демо доступно на **http://localhost:8010** (свой порт, чтобы не драться с
+`app` на 8000):
+
+```bash
+curl localhost:8010/health
+# 30 суток модельного времени за одну секунду
+curl -X POST localhost:8010/api/v1/demo/clock/advance \
+  -H 'Content-Type: application/json' -d '{"days": 30}'
+curl localhost:8010/api/v1/demo/scenarios
+```
+
+| Сервис | Порт | USE_MODEL_CLOCK | Когда поднимается |
+|---|---|---|---|
+| `app` | 8000 | `${USE_MODEL_CLOCK:-false}` — боевое время | `docker compose up` |
+| `demo` | 8010 | `"true"` жёстко — модельное время | `--profile demo` |
+| `dev` | 8001 | `${USE_MODEL_CLOCK:-true}` + hot reload | `--profile dev` |
+
+Демо — единственный сервис, который сам выполняет `alembic upgrade head` при
+старте: это одноразовый стенд, и отдельный шаг «не забудь накатить миграции»
+на защите стоил бы дороже, чем автоматизация. У `app` и `dev` поведение
+прежнее.
+
+> [!important] Почему раньше требовался `sudo -E`
+> `sudo` по умолчанию сбрасывает переменные окружения (`env_reset`), поэтому
+> на машине жюри подстановка `${USE_MODEL_CLOCK:-false}` всегда давала `false`,
+> и `/api/v1/demo/clock/advance` отвечал `409 CLOCK_NOT_MOCK`. Сервис `demo`
+> снимает зависимость от окружения хоста: значение задано в файле.
+
 ### Вариант B: локально без Docker для приложения
 
 ```bash
@@ -119,18 +165,39 @@ uv run alembic upgrade head     # создать схему
 uv run uvicorn app.main:app --reload
 ```
 
-Демо-сценарии с прокруткой времени удобнее с dev-образом — в нём
-`USE_MODEL_CLOCK` уже включён:
+Демо-сценарии с прокруткой времени локально:
 
 ```bash
 USE_MODEL_CLOCK=true uv run uvicorn app.main:app --reload
-# или весь стек с hot reload:
+# или весь стек с hot reload (порт 8001, модельное время включено):
 docker compose --profile dev up dev
 ```
 
-## Демо-стенд для жюри
+### Имена контейнеров и тома
 
-Для воспроизведения честных метрик качества без доступа к реальным данным:
+В compose нет `container_name` и нет `name:` у тома. Compose сам называет
+контейнеры `<проект>-<сервис>-1`, а том — `<проект>_pgdata`. Это не стилистика:
+хардкод ронял стенд при любой второй копии каталога или соседнем проекте на
+той же машине (`Conflict. The container name "/pr-db" is already in use`).
+
+Две копии репозитория рядом разводятся именем проекта:
+
+```bash
+docker compose -p stand-a up -d --build   # контейнеры stand-a-*, том stand-a_pgdata
+docker compose -p stand-b up -d --build   # контейнеры stand-b-*, том stand-b_pgdata
+```
+
+Порты на хосте при этом всё равно нужно развести: `POSTGRES_PORT=5434 APP_PORT=8002
+DEMO_PORT=8012 docker compose -p stand-b up -d --build`.
+
+Регрессия закрыта тестом `tests/unit/test_compose.py`: он падает, если
+`container_name` или `name:` у тома вернутся.
+
+## Засев демо-данных для метрик качества
+
+Для воспроизведения честных метрик качества без доступа к реальным данным.
+Это отдельная задача от демо-сервиса `demo` выше: здесь нужен разобранный
+проект под рукой, а не контейнер с модельным часом.
 
 ```bash
 # 1. Поднять только БД (любой PostgreSQL 16)
@@ -400,6 +467,7 @@ uv run pytest --no-cov
 | `tests/unit/test_mis.py` | 15 | идемпотентность, 12 типов событий, отказы переходов |
 | `tests/unit/test_routing.py` | 11 | конечный автомат, закрытие, тактика |
 | `tests/unit/test_settings.py` | 8 | DSN (TCP и unix-сокет), окружение |
+| `tests/unit/test_compose.py` | 28 | нет `container_name`/`name:` у тома, демо-сервис с модельным часом, `scripts` в обоих этапах образов |
 | `tests/integration/test_analysis_api.py` | 16 | `/analyze`, `/analyze/upload` |
 | `tests/integration/test_demo_api.py` | 10 | часы, сценарии, таймеры |
 | `tests/integration/test_health_api.py` | 8 | `/health`, `/ready`, OpenAPI |
@@ -588,7 +656,7 @@ infra/postgres/                # эталонная схема и сиды
 tests/                          # unit + integration
 Dockerfile                      # образ приложения (uv.lock, --frozen)
 Dockerfile.dev                  # dev-образ с hot reload
-docker-compose.yaml             # db + app (+ dev в профиле)
+docker-compose.yaml             # db + app (+ dev и demo в профилях)
 Makefile                        # команды разработки
 ```
 

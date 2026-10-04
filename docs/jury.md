@@ -64,9 +64,10 @@
   мгновенно. Ключевое требование кейса, реализовано и покрыто тестами.
 - 12 типов событий МИС обрабатываются с боевыми контрактами, не заглушками.
 
-**Чем доказываем**: локальный запуск за четыре команды (`docker compose up
--d --build`, `docker compose exec -T app alembic upgrade head`,
-`curl localhost:8000/ready`, открыть `/docs`).
+**Чем доказываем**: локальный запуск одной командой (`docker compose --profile
+demo up -d demo`, `curl localhost:8010/ready`, открыть `/docs`). Имена
+контейнеров и тома в compose не зашиты, поэтому стенд поднимается рядом с
+любой другой копией проекта — раньше это падало с `container name already in use`.
 
 **Честная оговорка**: данные — обезличенные протоколы хакатона, в
 репозитории их нет. Метрики нельзя пересчитать «с нуля» клонированием
@@ -183,19 +184,36 @@
 ### Подготовка (до выхода, 1 минута)
 
 ```bash
-cp .env.example .env
-docker compose up -d --build
-docker compose exec -T app alembic upgrade head
-USE_MODEL_CLOCK=true docker compose --profile dev up -d dev
-curl localhost:8000/ready
-curl localhost:8000/api/v1/demo/clock        # is_mock: true
+docker compose --profile demo up -d --build --wait demo
+# Загрузить заранее подготовленные синтетические data/demo/protocols.
+docker compose exec -T --user root demo mkdir -p /app/data
+docker compose cp ./data/demo demo:/app/data/demo
+docker compose exec -T --user root demo chown -R appuser:appuser /app/data
+docker compose exec -T demo python scripts/seed_demo.py
+curl localhost:8010/ready
+curl localhost:8010/api/v1/demo/clock        # is_mock: true
 ```
 
-> [!warning] Обязательно
-> Без `USE_MODEL_CLOCK=true` ручки `/api/v1/demo/clock/advance` отвечают 409
-> `CLOCK_NOT_MOCK`. В dev-профиле флаг уже включён.
+Каталог `data/demo` с синтетическими протоколами необходимо подготовить
+до показа (см. README, «Засев демо-данных для метрик качества»): данные
+не включены в образ. `--wait` дожидается готовности сервиса после миграций,
+затем `seed_demo.py` создаёт записи в БД и индекс исследований.
+Повторный засев не создаёт дубликатов.
 
-Открыть: Swagger `http://localhost:8000/docs` и терминал.
+> [!important] Без правки .env
+> Сервис `demo` жёстко задаёт `USE_MODEL_CLOCK=true` в самом compose-файле
+> и слушает порт **8010**. Ни `sudo -E`, ни `cp .env.example .env`, ни
+> экспорт переменных не нужны. Миграции он накатывает сам при старте.
+>
+> Раньше сценарий требовал `USE_MODEL_CLOCK=true docker compose --profile dev up dev`,
+> а на машине с `sudo` (env_reset) модельное время вообще не включалось —
+> `/api/v1/demo/clock/advance` отвечал 409 `CLOCK_NOT_MOCK`.
+
+Открыть: Swagger `http://localhost:8010/docs` и терминал.
+
+> Если по какой-то причине нужен именно dev-профиль с hot reload:
+> `docker compose --profile dev up dev` — он слушает **8001**, чтобы не
+> драться за 8000.
 
 ### Сценарий 1. `happy_path_gynecology` — 2 минуты
 
@@ -203,7 +221,7 @@ curl localhost:8000/api/v1/demo/clock        # is_mock: true
 
 ```bash
 # 1. МИС присылает подписанный протокол
-curl -s -X POST localhost:8000/api/v1/mis/events \
+curl -s -X POST localhost:8010/api/v1/mis/events \
   -H 'Content-Type: application/json' -d '{
   "event_id": "demo-001",
   "event_type": "StudyProtocolSigned",
@@ -228,7 +246,7 @@ curl -s -X POST localhost:8000/api/v1/mis/events \
 *«Норма с объяснением»*
 
 ```bash
-curl -s -X POST localhost:8000/api/v1/analyze -H 'Content-Type: application/json' -d '{
+curl -s -X POST localhost:8010/api/v1/analyze -H 'Content-Type: application/json' -d '{
   "text": "Заключение: УЗ-признаки полипа эндометрия не выявлено. Патологии не выявлено.",
   "study_type": "УЗИ органов малого таза"
 }' | jq '{route_would_be_created, matches: [.matches[] | {trigger_id, fired, suppression_reason}]}'
@@ -245,8 +263,8 @@ curl -s -X POST localhost:8000/api/v1/analyze -H 'Content-Type: application/json
 *«Пациент не записался»*
 
 ```bash
-curl -s localhost:8000/api/v1/demo/timers | jq '.[].timer_type'
-curl -s -X POST localhost:8000/api/v1/demo/clock/advance \
+curl -s localhost:8010/api/v1/demo/timers | jq '.[].timer_type'
+curl -s -X POST localhost:8010/api/v1/demo/clock/advance \
   -H 'Content-Type: application/json' -d '{"days": 30}' | jq
 ```
 
@@ -263,12 +281,12 @@ curl -s -X POST localhost:8000/api/v1/demo/clock/advance \
 *«Неявка на приём»*
 
 ```bash
-curl -s -X POST localhost:8000/api/v1/mis/events -H 'Content-Type: application/json' -d '{
+curl -s -X POST localhost:8010/api/v1/mis/events -H 'Content-Type: application/json' -d '{
   "event_id": "demo-noshow-001", "event_type": "VisitNoShow",
   "occurred_at": "2026-08-26T14:32:00Z",
   "subject": {"route_id": "<ROUTE_ID>"}
 }'
-curl -s -X POST localhost:8000/api/v1/demo/clock/advance \
+curl -s -X POST localhost:8010/api/v1/demo/clock/advance \
   -H 'Content-Type: application/json' -d '{"hours": 1}'
 ```
 
@@ -283,10 +301,10 @@ curl -s -X POST localhost:8000/api/v1/demo/clock/advance \
 Врач выбрал тактику и направил в стационар, но дата не назначена:
 
 ```bash
-curl -s -X POST localhost:8000/api/v1/routes/{route_id}/tactics \
+curl -s -X POST localhost:8010/api/v1/routes/{route_id}/tactics \
   -H 'Content-Type: application/json' \
   -d '{"tactics": "surgery_indicated", "comment": "Плановая операция", "create_referral": true}'
-curl -s -X POST localhost:8000/api/v1/demo/clock/advance \
+curl -s -X POST localhost:8010/api/v1/demo/clock/advance \
   -H 'Content-Type: application/json' -d '{"days": 7}'
 ```
 
@@ -399,7 +417,7 @@ precision должна остаться на текущем уровне — э�
 
 ```bash
 # тот же event_id второй раз
-curl -i -X POST localhost:8000/api/v1/mis/events ...   # → 200 duplicate: true
+curl -i -X POST localhost:8010/api/v1/mis/events ...   # → 200 duplicate: true
 ```
 
 Оговорка: `INSERT ... ON CONFLICT DO NOTHING` для таймеров гарантирует
