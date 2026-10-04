@@ -110,13 +110,38 @@ def read_clock() -> ClockOut:
     )
 
 
-async def _advance(hours: float, session: AsyncSession) -> dict[str, Any]:
+async def _persist(session: AsyncSession, usable: bool) -> bool:
+    """Зафиксировать отметки таймеров, которые сделал движок.
+
+    Коммит живёт здесь, в ручке, а не в ``TimerEngine``: транзакцией владеет
+    вызывающий код, и докстринг движка обещает именно это. Без коммита
+    ``UPDATE timer SET fired=true`` уходил бы с откатом сессии при закрытии,
+    и одни и те же напоминания срабатывали бы при каждой прокрутке заново —
+    ровно тот случай, который обещает ``docs/architecture.md``.
+
+    Базы нет — коммитить нечего, это штатный режим показа: возвращаем False,
+    чтобы ручка честно отметила в ответе ``database: unavailable``.
+    """
+    if not usable:
+        return False
+    try:
+        await session.commit()
+    except DB_DOWN:
+        # База легла между проверкой и коммитом: показ продолжается без таймеров.
+        await session.rollback()
+        return False
+    return True
+
+
+async def _advance(hours: float, session: AsyncSession) -> tuple[dict[str, Any], bool]:
     """Собрать эффекты и длительность, чтобы подтвердить прокрутку недель за секунды.
 
     Двигатель сам отдаёт ``from``/``to``/``fired``/``routes_affected``/
-    ``elapsed_ms``; коммит остаётся ответственностью вызывающего кода. База
-    нужна только ради записанных таймеров: если её нет, модельное время
-    двигается по слушателям часов, и показ продолжается.
+    ``elapsed_ms`` и оставляет транзакцию открытой; коммит — дело ручки
+    (:func:`_persist`). База нужна только ради записанных таймеров: если её
+    нет, модельное время двигается по слушателям часов, и показ продолжается.
+
+    Второе значение ответа — была ли база пригодна для записи таймеров.
     """
     usable = await db_available(session)
     engine = TimerEngine(session if usable else None)
@@ -142,7 +167,7 @@ async def _advance(hours: float, session: AsyncSession) -> dict[str, Any]:
         "routes_affected": result["routes_affected"],
         "elapsed_ms": result["elapsed_ms"],
         "database": "ok" if usable else "unavailable",
-    }
+    }, usable
 
 
 @router.post("/clock/advance", summary="Прокрутить время и выполнить таймеры")
@@ -153,7 +178,7 @@ async def advance(
     """Запустить просроченные действия без реального ожидания недель."""
     _model_clock()
     hours = payload.hours if payload.hours is not None else payload.days * 24
-    return await _advance(hours, session)
+    return await _advance_and_commit(hours, session)
 
 
 @router.post("/clock/set", summary="Перейти к моменту сценария")
@@ -168,7 +193,20 @@ async def set_time(
         raise HTTPException(
             409, detail={"code": "CLOCK_IN_PAST", "message": "Откат модельного времени запрещён."}
         )
-    return await _advance((payload.to - current).total_seconds() / 3600, session)
+    return await _advance_and_commit((payload.to - current).total_seconds() / 3600, session)
+
+
+async def _advance_and_commit(hours: float, session: AsyncSession) -> dict[str, Any]:
+    """Прокрутить время и зафиксировать результат — единственное место с коммитом.
+
+    Ручки продвижения времени проходят через этот помощник, поэтому «отметить
+    таймер выполненным ровно один раз» выполняется для всех трёх входов
+    одинаково, а транзакция остаётся в слое HTTP, как и обещает движок.
+    """
+    result, usable = await _advance(hours, session)
+    if not await _persist(session, usable):
+        result["database"] = "unavailable"
+    return result
 
 
 @router.post("/clock/reset", response_model=ClockOut, summary="Вернуться к старту демо")
@@ -178,6 +216,9 @@ async def reset_time(session: AsyncSession = Depends(get_session)) -> ClockOut:
     clock.reset(START)
     if await db_available(session):
         await session.execute(update(Timer).where(~Timer.fired).values(fired=True, fired_at=None))
+        # Гашение тоже должно пережить закрытие сессии, иначе следующий показ
+        # начнётся с уже сработавших таймеров предыдущего.
+        await _persist(session, True)
     return read_clock()
 
 

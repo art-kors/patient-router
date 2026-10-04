@@ -4,14 +4,14 @@ from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import AwareDatetime, BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import MisEvent
-from app.services.mis import EVENT_TYPES, MisEventHandler
+from app.services.mis import EVENT_TYPES, MisEventConflictError, MisEventHandler
 
 router = APIRouter(prefix="/api/v1/mis", tags=["МИС"])
 
@@ -46,7 +46,26 @@ class EventOut(BaseModel):
 async def receive_event(
     event: EventIn, response: Response, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> dict:
-    result = await MisEventHandler().handle(session, event.model_dump(mode="json"))
+    """Принять событие идемпотентно, не давая затереть уже записанный факт.
+
+    Повтор с тем же содержимым — дубль и HTTP 200. Повтор под тем же
+    ``event_id`` с другим payload, типом или временем — конфликт и HTTP 409
+    ``EVENT_ID_CONFLICT``: идентификатор доставки уже занят, а исходный факт
+    должен остаться в баве. Коммитим только после успешной обработки.
+    """
+    try:
+        result = await MisEventHandler().handle(session, event.model_dump(mode="json"))
+    except MisEventConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "EVENT_ID_CONFLICT",
+                "message": (
+                    f"event_id {exc} уже занят событием с другим содержимым. "
+                    "Исправление приходит новым event_id — исходный факт не перезаписывается."
+                ),
+            },
+        ) from exc
     await session.commit()
     if result["duplicate"]:
         response.status_code = 200

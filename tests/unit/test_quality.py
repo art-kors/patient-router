@@ -1,6 +1,7 @@
 """Проверки метрик и честного отсутствия данных без БД."""
 
 import json
+from uuid import uuid4
 
 import pytest
 
@@ -113,7 +114,7 @@ def test_невалидная_или_пустая_разметка(tmp_path, con
         load_labeled_samples(tmp_path)
 
 
-@pytest.mark.parametrize("endpoint", ["metrics", "confusion", "errors", "coverage"])
+@pytest.mark.parametrize("endpoint", ["metrics", "confusion", "errors"])
 async def test_api_без_разметки_возвращает_503(client, monkeypatch, tmp_path, endpoint):
     from app.settings import get_settings
 
@@ -121,6 +122,63 @@ async def test_api_без_разметки_возвращает_503(client, monk
     response = await client.get(f"/api/v1/quality/{endpoint}")
     assert response.status_code == 503
     assert "Нет размеченных данных" in response.json()["detail"]
+
+
+# ── Регрессия: README обещал рабочий /coverage, а ручка отдавала 503 ─────────
+# `data/labeled/` под .gitignore: разметка хакатона не публикуется, и в свежем
+# клоне её нет. 503 там законен, но README вводил жюри в заблуждение. Теперь
+# ручка отвечает всегда: общее число триггеров считается по матрице, а покрытие
+# без разметки честно помечается как недоступное (null, а не ложный ноль).
+
+
+async def test_coverage_без_разметки_отвечает_честно(client, monkeypatch, tmp_path):
+    from app.settings import get_settings
+
+    monkeypatch.setattr(get_settings(), "labeled_data_dir", str(tmp_path))
+    response = await client.get("/api/v1/quality/coverage")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is False
+    assert body["total"] > 0, "матрица всегда на месте — её размер известен без разметки"
+    assert body["covered"] is None and body["ratio"] is None, "ложный ноль читался бы как оценка"
+    assert body["labeled_samples"] == 0
+    assert "Нет данных для оценки покрытия" in body["message"]
+
+
+async def test_coverage_с_разметкой_считает_покрытие(client, monkeypatch, tmp_path):
+    import json
+
+    from app.api import quality as api
+    from app.main import app
+    from app.settings import get_settings
+
+    triggers = api.load_triggers()
+    (tmp_path / "gold.json").write_text(
+        json.dumps(
+            [
+                {
+                    "study_id": str(uuid4()),
+                    "trigger_id": triggers[0].trigger_id,
+                    "label": True,
+                    "split": "gold",
+                }
+            ]
+        )
+    )
+    monkeypatch.setattr(get_settings(), "labeled_data_dir", str(tmp_path))
+    monkeypatch.setattr(get_settings(), "study_index_path", str(tmp_path / "нет.json"))
+    app.dependency_overrides[api.optional_samples] = lambda: api.labeled_samples()
+    try:
+        response = await client.get("/api/v1/quality/coverage")
+    finally:
+        app.dependency_overrides.pop(api.optional_samples)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["covered"] == 1
+    assert body["ratio"] == 1 / len({t.trigger_id for t in triggers})
+    assert body["labeled_samples"] == 1
+    assert body["message"] is None
 
 
 async def test_api_суммирует_исследования_без_смешивания(client, monkeypatch):

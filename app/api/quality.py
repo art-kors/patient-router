@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -35,6 +35,25 @@ class MetricsOut(BaseModel):
     split: Split
 
 
+class CoverageOut(BaseModel):
+    """Покрытие триггеров разметкой и честный отказ, когда разметки нет.
+
+    Поля ``covered``/``ratio`` nullable не для удобства: без разметки покрытие
+    посчитать нельзя, и null честнее нуля — ноль читался бы как «триггеры не
+    проверялись движком», то есть как правдивый, но неверный вывод.
+    """
+
+    total: int = Field(description="Всего триггеров в матрице — считается всегда")
+    covered: int | None = Field(description="Триггеров с примерами в разметке; null без разметки")
+    uncovered: list[str] = Field(description="Триггеры без примеров в разметке")
+    ratio: float | None = Field(description="Доля покрытия; null без разметки")
+    labeled_samples: int = Field(description="Сколько записей разметки прочитано")
+    available: bool = Field(description="Есть ли данные для оценки покрытия")
+    message: str | None = Field(
+        default=None, description="Почему покрытие не посчитано, когда available=false"
+    )
+
+
 def labeled_samples() -> list[quality.LabeledSample]:
     """Загрузить разметку и привязать к реальным UUID через индекс."""
     try:
@@ -52,6 +71,20 @@ def labeled_samples() -> list[quality.LabeledSample]:
 
 
 Samples = Annotated[list[quality.LabeledSample], Depends(labeled_samples)]
+
+
+def optional_samples() -> list[quality.LabeledSample] | None:
+    """Разметка для ручек, которые умеют ответить и без неё.
+
+    Отсутствие или порча разметки — не 503, а ``None``: решение о том, что с
+    этим делать, принимает сама ручка. ``/coverage`` отвечает «нет данных для
+    оценки покрытия», а ``/metrics`` по-прежнему отказывает: без разметки там
+    нечего считать вовсе.
+    """
+    try:
+        return labeled_samples()
+    except HTTPException:
+        return None
 
 
 def _scoped(metric, *args, **kwargs):
@@ -153,7 +186,34 @@ async def errors(
     return result
 
 
-@router.get("/coverage")
-def coverage(samples: Samples) -> dict:
-    """Покрытие триггеров разметкой без обращения к БД."""
-    return quality.coverage(load_triggers(), samples)
+@router.get("/coverage", response_model=CoverageOut)
+def coverage(
+    samples: Annotated[list[quality.LabeledSample] | None, Depends(optional_samples)],
+) -> CoverageOut:
+    """Покрытие триггеров разметкой без обращения к БД.
+
+    Разметка хакатона не публикуется, поэтому в свежем клоне её нет — и раньше
+    ручка отдавала 503, хотя README обещал рабочий ответ. Теперь общее число
+    триггеров считается всегда (оно лежит в ``config/routing_matrix.json``),
+    а покрытие требует разметки и без неё честно сообщает, что данных для
+    оценки нет: ``covered`` и ``ratio`` равны null, а не 0.
+    """
+    triggers = load_triggers()
+    total = len({trigger.trigger_id for trigger in triggers})
+    if not samples:
+        return CoverageOut(
+            total=total,
+            covered=None,
+            uncovered=[],
+            ratio=None,
+            labeled_samples=0,
+            available=False,
+            message=(
+                "Нет данных для оценки покрытия: каталог разметки "
+                f"{get_settings().labeled_data_dir} пуст или отсутствует. "
+                "Матрица содержит "
+                f"{total} триггер(ов) — проверьте их через POST /api/v1/analyze."
+            ),
+        )
+    result = quality.coverage(triggers, samples)
+    return CoverageOut(**result, labeled_samples=len(samples), available=True)

@@ -40,6 +40,13 @@ TERMINAL_STATUSES = frozenset(
         "cancelled",
     }
 )
+# Тактика обязательна только там, где маршрут закрывает решение врача.
+# Из decision_pending закрытие равно выбору тактики: «операция не показана» и
+# «пациент отказался» — это apply_tactics, а не пустой переход. Остальные
+# закрытия тактики не требуют по смыслу: control без тактики (followup_done),
+# недостижимый маршрут, отмена протокола и отзыв триггера — решения системы
+# или пациента, а не врачебная тактика. Их запрещать нельзя.
+TACTICS_REQUIRED_FROM = frozenset({"decision_pending"})
 TRANSITIONS = {
     "created": {"notified", "cancelled"},
     "notified": {"awaiting_booking", "cancelled", "route_not_realized", "closed_by_patient"},
@@ -86,6 +93,25 @@ _CLOSE_REASONS = {
 def allowed_transitions(status: RouteStatus | str) -> set[str]:
     """Даёт вызывающему коду правила выбора следующего этапа без изменения матрицы."""
     return set(TRANSITIONS[RouteStatus(status).value])
+
+
+async def _has_recorded_tactics(session: AsyncSession, route_id: UUID) -> bool:
+    """Проверить, что тактика врача уже записана в аудите маршрута.
+
+    Отдельной колонки у маршрута нет: выбор тактики живёт в ``audit_log.details``,
+    как и обещает ``docs/api.md``. Поэтому ищем по ключу, а не по тексту записи.
+    """
+    return (
+        await session.scalar(
+            select(func.count())
+            .select_from(AuditLog)
+            .where(
+                AuditLog.route_id == route_id,
+                AuditLog.details["tactics"].as_string().is_not(None),
+            )
+        )
+        or 0
+    ) > 0
 
 
 class RoutingService:
@@ -182,6 +208,19 @@ class RoutingService:
         if to_status not in allowed_transitions(route.status):
             raise RoutingTransitionError(f"Переход {route.status} → {to_status} невозможен")
         to_status = RouteStatus(to_status).value
+        # Закрытие вместо решения врача: без записанной тактики оно невозможно.
+        # Проверка внутри сервиса, а не в ручке, — иначе боевой путь через событие
+        # МИС обошёл бы её и закрыл маршрут в обход требования кейса.
+        if (
+            str(RouteStatus(route.status).value) in TACTICS_REQUIRED_FROM
+            and to_status in TERMINAL_STATUSES
+            and not fields.get("tactics")
+            and not await _has_recorded_tactics(session, route_id)
+        ):
+            raise TacticsRequiredError(
+                "Закрыть маршрут без тактики нельзя: укажите решение врача "
+                "в POST /api/v1/routes/{route_id}/tactics"
+            )
         permitted_fields = {
             "target_date",
             "specialty_id",
