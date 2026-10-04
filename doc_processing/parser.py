@@ -213,15 +213,19 @@ def parse_docx(file_path: str | Path) -> dict:
 
                 column_index += grid_span
 
-            rows.append({
-                "row": row_index,
-                "cells": cells,
-            })
+            rows.append(
+                {
+                    "row": row_index,
+                    "cells": cells,
+                }
+            )
 
-        result["tables"].append({
-            "table_index": table_index,
-            "rows": rows,
-        })
+        result["tables"].append(
+            {
+                "table_index": table_index,
+                "rows": rows,
+            }
+        )
 
     return result
 
@@ -237,10 +241,10 @@ def parse_directory(
     output_dir = Path(output_dir)
 
     if not input_dir.exists():
-        raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
+        raise FileNotFoundError(f"Каталог ввода не существует: {input_dir}")
 
     if not input_dir.is_dir():
-        raise NotADirectoryError(f"Input path is not a directory: {input_dir}")
+        raise NotADirectoryError(f"Путь ввода не является каталогом: {input_dir}")
 
     docx_files = sorted(input_dir.rglob("*.docx"))
 

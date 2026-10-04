@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import copy
-import json
 import re
 from typing import Any
-
 
 _ALLOWED_STUDY_KEYS = {"type"}
 _REMOVED_KEYS = {
@@ -31,15 +29,13 @@ def _clean_text(value: Any) -> str:
 
 def prepare_document_for_llm(document: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(document, dict):
-        raise TypeError("LLM input must be a JSON object.")
+        raise TypeError("Входные данные модели должны быть объектом JSON.")
 
     prepared = copy.deepcopy(document)
 
     if isinstance(prepared.get("study"), dict):
         prepared["study"] = {
-            key: value
-            for key, value in prepared["study"].items()
-            if key in _ALLOWED_STUDY_KEYS
+            key: value for key, value in prepared["study"].items() if key in _ALLOWED_STUDY_KEYS
         }
 
     for key in list(prepared.keys()):
@@ -57,7 +53,7 @@ def prepare_document_for_llm(document: dict[str, Any]) -> dict[str, Any]:
         raw_lines = section.get("lines") or [section.get("text")]
         cleaned_lines: list[str] = []
         for line in raw_lines:
-            text = _clean_text(line)
+            text = str(line).strip() if line is not None else ""
             if not text:
                 continue
             lowered = text.lower()
@@ -88,7 +84,9 @@ def normalize_findings_response(response: Any) -> dict[str, Any]:
             continue
         section = _clean_text(item.get("section") or item.get("organ") or "unknown")
         finding = _clean_text(item.get("finding") or item.get("term") or item.get("name") or "")
-        quote = _clean_text(item.get("quote") or item.get("text") or item.get("source_text") or "")
+        quote = item.get("quote")
+        if not isinstance(quote, str):
+            quote = ""
         certainty = _clean_text(item.get("certainty") or item.get("status") or "confirmed").lower()
         laterality = _clean_text(item.get("laterality") or item.get("side") or "")
 
@@ -100,7 +98,9 @@ def normalize_findings_response(response: Any) -> dict[str, Any]:
                 "section": section or "unknown",
                 "finding": finding or quote,
                 "quote": quote,
-                "certainty": certainty if certainty in {"confirmed", "suggested", "negated"} else "confirmed",
+                "certainty": certainty
+                if certainty in {"confirmed", "suggested", "negated"}
+                else "confirmed",
                 "laterality": laterality,
             }
         )

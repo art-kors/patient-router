@@ -19,7 +19,13 @@ class OllamaExtractionError(RuntimeError):
 
 
 class OllamaClient:
-    def __init__(self, *, base_url: str = "http://localhost:11434", model: str = "medgemma:4b", timeout: int = 120):
+    def __init__(
+        self,
+        *,
+        base_url: str = "http://localhost:11434",
+        model: str = "medgemma:4b",
+        timeout: int = 120,
+    ):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
@@ -35,7 +41,9 @@ class OllamaClient:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.URLError as exc:
-            raise OllamaNotAvailableError(f"Unable to reach Ollama at {self.base_url}: {exc}") from exc
+            raise OllamaNotAvailableError(
+                f"Нет соединения с Ollama по адресу {self.base_url}: {exc}"
+            ) from exc
 
     def extract_findings(self, document: dict[str, Any]) -> dict[str, Any]:
         sanitized = prepare_document_for_llm(document)
@@ -55,16 +63,16 @@ class OllamaClient:
             if isinstance(data, dict) and "findings" in data:
                 raw_content = data
             else:
-                raise OllamaExtractionError("Ollama response did not include a findings payload.")
+                raise OllamaExtractionError("Ответ Ollama не содержит результатов извлечения.")
 
         if isinstance(raw_content, str):
             stripped = raw_content.strip()
             if not stripped:
-                return {"findings": []}
+                raise OllamaExtractionError("Модель вернула пустой ответ")
             try:
                 parsed = json.loads(stripped)
-            except json.JSONDecodeError:
-                parsed = {"findings": []}
+            except json.JSONDecodeError as exc:
+                raise OllamaExtractionError("Модель вернула невалидный JSON") from exc
         else:
             parsed = raw_content
 

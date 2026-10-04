@@ -1,4 +1,4 @@
-from parsing.pipeline import main
+from .parsing.pipeline import main
 
 if __name__ == "__main__":
     main()

@@ -8,8 +8,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from doc_processing.parsing.pipeline import process_one_document
 from doc_processing.llm.pipeline import extract_findings_for_document
+from doc_processing.parsing.pipeline import process_one_document
 
 
 def _ollama_ready(host: str) -> bool:
@@ -60,14 +60,14 @@ def process_report(
     host: str = "http://127.0.0.1:11434",
     output_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Process one report file.
+    """Обработать один файл протокола.
 
-    mode in {"full", "compact"} controls the deterministic parser output.
-    with_llm=True adds a 'findings' block using Ollama only for the chosen file.
+    Режим full или compact определяет структуру результата парсера.
+    Параметр with_llm добавляет находки Ollama для выбранного файла.
     """
     source = Path(file_path)
     if not source.exists():
-        raise FileNotFoundError(f"Input file does not exist: {source}")
+        raise FileNotFoundError(f"Входной файл не существует: {source}")
 
     payload = process_one_document(source, output_mode=mode)
 

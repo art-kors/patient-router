@@ -1,6 +1,7 @@
 """Конфигурация приложения из переменных окружения."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,6 +17,13 @@ class Settings(BaseSettings):
     environment: str = "dev"
     debug: bool = True
     log_level: str = "INFO"
+
+    # --- декодер: модель включается только явно ---
+    decoder_mode: Literal["rules", "llm"] = "rules"
+    ollama_url: str = "http://localhost:11434"
+    ollama_model: str = "medgemma:4b"
+    ollama_timeout: int = Field(default=120, gt=0)
+    decoder_fallback: bool = True
 
     # --- БД ---
     postgres_host: str = "db"

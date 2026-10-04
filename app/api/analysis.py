@@ -68,6 +68,8 @@ class AnalyzeResponse(BaseModel):
     study_type: str | None = None
     extractor: str = Field(description="Какой декодер сработал")
     conclusion_extracted: bool
+    decoder_used: str = Field(default="rules", description="Фактически использованный декодер")
+    llm_error: str | None = Field(default=None, description="Причина отката модели на правила")
 
     findings: list[FindingOut]
     matches: list[TriggerMatchOut]
@@ -176,6 +178,8 @@ def _analyze(text: str, study_type: str | None) -> AnalyzeResponse:
     return AnalyzeResponse(
         study_type=extraction.meta.study_type,
         extractor=extraction.extractor_name,
+        decoder_used=extraction.decoder_used,
+        llm_error=extraction.llm_error,
         conclusion_extracted=extraction.conclusion_extracted,
         findings=[
             FindingOut(

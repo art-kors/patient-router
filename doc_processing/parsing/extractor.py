@@ -22,7 +22,7 @@ CONCLUSION_PREFIX_PATTERN = re.compile(
 
 
 class ParsedDocumentError(ValueError):
-    """Raised when input JSON is not in the humanized parser format."""
+    """Ошибка формата структурированного протокола."""
 
 
 def normalize_whitespace(value: Any) -> str:
@@ -50,15 +50,15 @@ def transform_document(
     payload: dict[str, Any],
     report_id: str,
 ) -> dict[str, Any]:
-    """Convert humanized parser JSON into compact, ordered clinical blocks."""
+    """Преобразовать структурированный протокол в упорядоченные клинические блоки."""
     if not isinstance(payload, dict):
-        raise ParsedDocumentError("Top-level JSON value must be an object.")
+        raise ParsedDocumentError("Верхний уровень JSON должен быть объектом.")
 
     sections = payload.get("sections")
     if not isinstance(sections, list):
         raise ParsedDocumentError(
-            "Expected parser_humanized JSON with a 'sections' list. "
-            "Raw table-only JSON is not supported."
+            "Ожидается JSON parser_humanized со списком sections. "
+            "JSON только с таблицами не поддерживается."
         )
 
     study = payload.get("study")
@@ -87,9 +87,7 @@ def transform_document(
 
             recommendation_match = RECOMMENDATION_PATTERN.search(text)
             if recommendation_match:
-                recommendation = remove_boilerplate(
-                    text[recommendation_match.end() :]
-                )
+                recommendation = remove_boilerplate(text[recommendation_match.end() :])
                 if recommendation:
                     recommendations.append(recommendation)
                 text = text[: recommendation_match.start()]
@@ -109,9 +107,7 @@ def transform_document(
                 "block_id": f"b{len(blocks) + 1:03d}",
                 "section": section_name,
                 "source": (
-                    "conclusion"
-                    if section_name.casefold() == "conclusion"
-                    else "description"
+                    "conclusion" if section_name.casefold() == "conclusion" else "description"
                 ),
                 "text": "\n".join(clinical_lines),
             }

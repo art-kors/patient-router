@@ -1,20 +1,10 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
-try:
-    from doc_processing.parser_humanized import parse_one as parse_humanized_one
-except ModuleNotFoundError:
-    try:
-        from parser_humanized import parse_one as parse_humanized_one
-    except ModuleNotFoundError:
-        ready_to_run_root = Path(__file__).resolve().parents[1]
-        if str(ready_to_run_root) not in sys.path:
-            sys.path.insert(0, str(ready_to_run_root))
-        from parser_humanized import parse_one as parse_humanized_one
+from doc_processing.parser_humanized import parse_one as parse_humanized_one
 
 from .client import OllamaClient
 from .extractor import prepare_document_for_llm
@@ -42,7 +32,7 @@ def run_llm_pipeline(
 ) -> dict[str, Any]:
     source = Path(input_path)
     if not source.exists():
-        raise FileNotFoundError(f"Input path does not exist: {source}")
+        raise FileNotFoundError(f"Путь ввода не существует: {source}")
 
     if source.suffix.lower() == ".docx":
         payload = parse_humanized_one(source)
@@ -56,7 +46,9 @@ def run_llm_pipeline(
         timeout=timeout,
     )
 
-    destination = Path(output_path) if output_path is not None else source.with_suffix(".findings.json")
+    destination = (
+        Path(output_path) if output_path is not None else source.with_suffix(".findings.json")
+    )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     return result

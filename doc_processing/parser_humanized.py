@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from parser import parse_docx
+from .parser import parse_docx
 
 SECTION_HEADERS: dict[str, list[str]] = {
     "матка": [r"^\s*матка\b", r"^\s*матка\s*:"],
@@ -251,7 +251,8 @@ def match_section_header(text: str) -> str | None:
 def is_service_marker(text: str) -> bool:
     return bool(
         re.search(
-            r"^(?:ЗАКЛЮЧЕНИЕ|Рекомендовано|ORADS|TI-RADS|BI-RADS|Данное заключение не является|ДАННОЕ ЗАКЛЮЧЕНИЕ НЕ ЯВЛЯЕТСЯ)",
+            r"^(?:ЗАКЛЮЧЕНИЕ|Рекомендовано|ORADS|TI-RADS|BI-RADS|"
+            r"Данное заключение не является|ДАННОЕ ЗАКЛЮЧЕНИЕ НЕ ЯВЛЯЕТСЯ)",
             text,
             flags=re.IGNORECASE,
         )
@@ -377,7 +378,9 @@ def strip_internal_fields(records: list[dict[str, Any]]) -> list[dict[str, Any]]
     return cleaned
 
 
-def extract_findings(section_records: list[dict[str, Any]], conclusion_text: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def extract_findings(
+    section_records: list[dict[str, Any]], conclusion_text: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     negations: list[dict[str, Any]] = []
 
@@ -462,7 +465,11 @@ def parse_conclusion(cells: list[dict[str, Any]]) -> str:
         if in_conclusion:
             if is_service_marker(text):
                 break
-            if re.search(r"^(?:Рекомендовано|ORADS|TI-RADS|BI-RADS|Данное заключение не является)", text, flags=re.IGNORECASE):
+            if re.search(
+                r"^(?:Рекомендовано|ORADS|TI-RADS|BI-RADS|Данное заключение не является)",
+                text,
+                flags=re.IGNORECASE,
+            ):
                 break
             fragments.append(text)
 
@@ -508,9 +515,9 @@ def parse_directory_humanized(input_dir: str | Path, output_dir: str | Path) -> 
     output_dir = Path(output_dir)
 
     if not input_dir.exists():
-        raise FileNotFoundError(f"Input directory does not exist: {input_dir}")
+        raise FileNotFoundError(f"Каталог ввода не существует: {input_dir}")
     if not input_dir.is_dir():
-        raise NotADirectoryError(f"Input path is not a directory: {input_dir}")
+        raise NotADirectoryError(f"Путь ввода не является каталогом: {input_dir}")
 
     docx_files = sorted(input_dir.rglob("*.docx"))
     written: list[Path] = []
@@ -529,9 +536,11 @@ def parse_directory_humanized(input_dir: str | Path, output_dir: str | Path) -> 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Humanized parser for MediTron DOCX reports")
-    parser.add_argument("--input-dir", default="protocols", help="Directory with DOCX files")
-    parser.add_argument("--output-dir", default="output_humanized", help="Directory for JSON output")
+    parser = argparse.ArgumentParser(description="Структурированный разбор протоколов DOCX")
+    parser.add_argument("--input-dir", default="protocols", help="Каталог с файлами DOCX")
+    parser.add_argument(
+        "--output-dir", default="output_humanized", help="Каталог для результатов JSON"
+    )
     args = parser.parse_args()
 
     parse_directory_humanized(args.input_dir, args.output_dir)

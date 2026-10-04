@@ -1,9 +1,34 @@
-# Meditron ready_to_run
+# Извлечение находок УЗИ для patient-router
 
-Local parser and findings extractor for medical protocol documents.
-
-Usage:
+Запуск из корня проекта; зависимости управляются общим `pyproject.toml`:
 
 ```bash
-pip install -e ./ready_to_run
+uv sync
+uv run python -m doc_processing.run_pipeline --input-dir protocols --output-dir output_humanized
+uv run python -m doc_processing.llm.run_llm --input output_humanized/report.json --model medgemma:4b
+uv run python -m scripts.evaluate_extraction
 ```
+
+Для второго запуска нужен уже установленный сервер Ollama и модель `medgemma:4b`.
+Приложение через `get_extractor()` использует `TeammateExtractor`: правила из
+`parser_humanized.py` и словарный резерв для ранее поддержанных формулировок.
+Словарь сохраняет отрицания матрицы и совместимость с существующими сценариями.
+Это гибрид правил, а не оценка качества MedGemma.
+
+Модель подключается явно: `TeammateExtractor(client=OllamaClient())`, затем
+`set_extractor(...)` из `app.services.extraction`. При недоступности сервера
+возвращается пустой результат без скрытой подмены модели словарём. При оценке
+сначала отдельно проверяйте доступность сервера и модели; пустой результат
+при ошибке сервера нельзя считать измерением качества модели.
+
+Адаптер отбрасывает пустые и отсутствующие в исходнике цитаты LLM. Смещения
+вычисляются поиском дословной подстроки; пробелы цитаты LLM не нормализуются.
+Правиловый парсер сворачивает пробелы: для его результата адаптер восстанавливает
+дословный фрагмент с теми же словами из исходника. Отрицания `negations` и
+`certainty=negated` превращаются в `in_negative_context`.
+
+Оценка использует `DecisionEngine` и `compute_metrics` проекта. Если внешний
+файл разметки отсутствует, скрипт восстанавливает её из опубликованного `GOLD`
+в `scripts/make_demo_data.py`, с той же сортировкой и `build_labels`.
+89 файлов проходят извлечение; размечены 204 пары для 79 исследований.
+Для простаты в матрице нет соответствующих триггеров.

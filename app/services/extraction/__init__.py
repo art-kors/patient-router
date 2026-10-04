@@ -1,8 +1,6 @@
-"""Извлечение фактов из протокола.
+"""Контракт извлечения и регистрация адаптера пакета doc_processing.
 
-Здесь живёт контракт декодера (base.py) и рабочая заглушка
-(dictionary_extractor.py). Сокомандник подключает свою реализацию,
-переопределив get_extractor().
+Словарный экстрактор доступен для сравнения и совместимых сценариев.
 """
 
 from app.services.extraction.base import (
@@ -18,17 +16,22 @@ _extractor: ProtocolExtractor | None = None
 
 
 def get_extractor() -> ProtocolExtractor:
-    """Декодер, используемый приложением.
-
-    ЗАМЕНИТЬ ЗДЕСЬ: когда сокомандник пришлёт свою реализацию,
-    достаточно вернуть её отсюда. Больше нигде менять не нужно.
-
-        def get_extector() -> ProtocolExtractor:
-            return LlmExtractor()  # вместо DictionaryExtractor()
-    """
+    """Создать декодер по настройкам без соединения с сервером модели."""
     global _extractor
     if _extractor is None:
-        _extractor = DictionaryExtractor()
+        from app.settings import get_settings
+        from doc_processing.adapter import TeammateExtractor
+        from doc_processing.llm.client import OllamaClient
+
+        settings = get_settings()
+        client = None
+        if settings.decoder_mode == "llm":
+            client = OllamaClient(
+                base_url=settings.ollama_url,
+                model=settings.ollama_model,
+                timeout=settings.ollama_timeout,
+            )
+        _extractor = TeammateExtractor(client=client, fallback=settings.decoder_fallback)
         validate_extractor(_extractor)
     return _extractor
 
