@@ -7,6 +7,7 @@
 
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
+from time import perf_counter
 
 
 class Clock(ABC):
@@ -15,6 +16,10 @@ class Clock(ABC):
     @abstractmethod
     def now(self) -> datetime:
         """Текущее время (aware, UTC)."""
+
+    def monotonic(self) -> float:
+        """Монотонный счётчик для длительности: перевод модельного времени не влияет."""
+        return perf_counter()
 
     def is_mock(self) -> bool:
         """Модельное ли время — для логирования и /demo/clock."""

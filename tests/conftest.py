@@ -52,3 +52,44 @@ def pytest_collection_modifyitems(items):
     for item in items:
         if "integration" in str(item.fspath):
             item.add_marker(pytest.mark.integration)
+
+
+@pytest.fixture
+def analytics_session():
+    """Настоящие SQL-запросы журнала на изолированной SQLite без сервера БД."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.models import AnalysisFeedback, AnalysisRun, Study
+
+    class SessionAdapter:
+        """Минимальный асинхронный интерфейс над синхронной тестовой сессией."""
+
+        def __init__(self):
+            self.bind = create_engine("sqlite://")
+            for model in (AnalysisRun, AnalysisFeedback, Study):
+                model.__table__.create(self.bind)
+            self.sync = Session(self.bind, expire_on_commit=False)
+
+        async def execute(self, stmt):
+            return self.sync.execute(stmt)
+
+        async def scalar(self, stmt):
+            return self.sync.scalar(stmt)
+
+        async def scalars(self, stmt):
+            return self.sync.scalars(stmt)
+
+        async def get(self, model, identifier):
+            return self.sync.get(model, identifier)
+
+        async def commit(self):
+            self.sync.commit()
+
+        async def rollback(self):
+            self.sync.rollback()
+
+    session = SessionAdapter()
+    yield session
+    session.sync.close()
+    session.bind.dispose()

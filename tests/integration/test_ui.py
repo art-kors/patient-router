@@ -24,6 +24,14 @@ class Elements(HTMLParser):
 
 
 PAGE_ELEMENTS = {
+    "/analytics": {
+        "cards": "div",
+        "triggers": "div",
+        "trend": "div",
+        "analyze": "form",
+        "runs": "div",
+        "compare": "button",
+    },
     "/": {
         "cards": "div",
         "confusion": "div",
@@ -83,7 +91,7 @@ async def test_page_contract(client, path):
 async def test_page_resources_and_navigation(client, path):
     """Скрипт запускается через defer, ресурсы доступны, переходы ведут на все страницы."""
     elements = Elements((await client.get(path)).text).elements
-    script = "dashboard.js" if path == "/" else "clinical.js"
+    script = {"/": "dashboard.js", "/analytics": "analytics.js"}.get(path, "clinical.js")
     assert any(
         tag == "script" and attrs.get("src") == f"/static/{script}" and "defer" in attrs
         for tag, attrs in elements
@@ -94,7 +102,7 @@ async def test_page_resources_and_navigation(client, path):
         if tag == "link" and attrs.get("rel") == "stylesheet"
     }
     assert "/static/style.css" in styles
-    if path != "/":
+    if path not in ("/", "/analytics"):
         assert "/static/clinical.css" in styles
     assert set(PAGE_ELEMENTS) <= {attrs.get("href") for tag, attrs in elements if tag == "a"}
     for resource in styles | {f"/static/{script}"}:

@@ -4,16 +4,19 @@
     POST /api/v1/analyze  →  находки + сработавшие и подавленные триггеры
 
 Здесь НЕТ создания маршрута: это отдельный шаг (POST /api/v1/routes).
-Разделение намеренное — анализ ничего не меняет в системе, его можно
-гонять сколько угодно для отладки и разметки.
+Каждый успешный анализ сохраняет обезличенный журнал для оценки качества.
 """
 
 import io
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, UploadFile
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from pydantic import BaseModel, Field, PrivateAttr
+from sqlalchemy.exc import SQLAlchemyError
 
+from app.clock import get_clock
+from app.db import get_session
+from app.services.analytics import record
 from app.services.decision import DecisionEngine
 from app.services.extraction import get_extractor
 
@@ -65,6 +68,9 @@ class AnalyzeRequest(BaseModel):
 class AnalyzeResponse(BaseModel):
     """Ответ анализа: что нашли и что с этим делать."""
 
+    _triggers: list = PrivateAttr(default_factory=list)
+    _winner_trigger_id: str | None = PrivateAttr(default=None)
+    analysis_id: str | None = None
     study_type: str | None = None
     extractor: str = Field(description="Какой декодер сработал")
     conclusion_extracted: bool
@@ -109,13 +115,17 @@ class AnalyzeResponse(BaseModel):
     response_model=AnalyzeResponse,
     summary="Разобрать протокол и объяснить решение",
 )
-async def analyze_text(payload: AnalyzeRequest) -> AnalyzeResponse:
+async def analyze_text(
+    payload: AnalyzeRequest,
+    session=Depends(get_session),
+    idempotency_key: Annotated[str | None, Header(max_length=200)] = None,
+) -> AnalyzeResponse:
     """Анализ текста протокола.
 
-    Не меняет состояние системы: ни маршрута, ни уведомлений.
+    Записывает обезличенный журнал; маршруты и уведомления не создаёт.
     Нужен для демонстрации объяснимости и для отладки правил.
     """
-    return _analyze(payload.text, payload.study_type)
+    return await _recorded(payload.text, payload.study_type, session, idempotency_key)
 
 
 @router.post(
@@ -126,6 +136,8 @@ async def analyze_text(payload: AnalyzeRequest) -> AnalyzeResponse:
 async def analyze_upload(
     file: Annotated[UploadFile, File(description="Файл протокола .docx или .txt")],
     study_type: Annotated[str | None, Form()] = None,
+    session=Depends(get_session),
+    idempotency_key: Annotated[str | None, Header(max_length=200)] = None,
 ) -> AnalyzeResponse:
     """То же, что /analyze, но файлом.
 
@@ -133,7 +145,7 @@ async def analyze_upload(
     """
     raw = await file.read()
     text = _decode(raw)
-    return _analyze(text, study_type)
+    return await _recorded(text, study_type, session, idempotency_key)
 
 
 def _decode(raw: bytes) -> str:
@@ -175,7 +187,7 @@ def _analyze(text: str, study_type: str | None) -> AnalyzeResponse:
     is_emergency = decision.is_emergency
     route_would_be_created = winner is not None and not is_emergency
 
-    return AnalyzeResponse(
+    response = AnalyzeResponse(
         study_type=extraction.meta.study_type,
         extractor=extraction.extractor_name,
         decoder_used=extraction.decoder_used,
@@ -211,3 +223,19 @@ def _analyze(text: str, study_type: str | None) -> AnalyzeResponse:
         triggered_count=len(decision.fired),
         suppressed_count=len(decision.suppressed),
     )
+    response._triggers = engine.triggers
+    response._winner_trigger_id = winner.trigger.trigger_id if winner else None
+    return response
+
+
+async def _recorded(text, study_type, session, key):
+    """Отвечать успехом только после надёжной записи журнала."""
+    started = get_clock().monotonic()
+    response = _analyze(text, study_type)
+    try:
+        response.analysis_id = str(await record(session, response, text, started, key))
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except (SQLAlchemyError, OSError) as exc:
+        raise HTTPException(503, "Журнал разборов недоступен") from exc
+    return response

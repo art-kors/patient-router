@@ -773,3 +773,39 @@ __all__ = [
     "TriggerDef",
     "TriggerMatch",
 ]
+
+
+class AnalysisRun(Base):
+    """Обезличенный журнал: без исходного текста, цитат и идентификатора пациента."""
+
+    __tablename__ = "analysis_run"
+
+    id: Mapped[UUID] = _uuid()
+    request_key: Mapped[str | None] = mapped_column(String(64), unique=True)
+    text_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    text_length: Mapped[int] = mapped_column(Integer, nullable=False)
+    study_type: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    duration_ms: Mapped[float] = mapped_column(Numeric, nullable=False)
+    decoder_used: Mapped[str] = mapped_column(String(32), nullable=False)
+    fallback: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    findings: Mapped[list] = mapped_column(JSON, nullable=False)
+    matches: Mapped[list] = mapped_column(JSON, nullable=False)
+
+
+class AnalysisFeedback(Base):
+    """Одна актуальная врачебная оценка пары разбор–триггер."""
+
+    __tablename__ = "analysis_feedback"
+    __table_args__ = (
+        UniqueConstraint("analysis_id", "trigger_id", name="uq_analysis_feedback_pair"),
+        CheckConstraint(
+            "label IN ('confirmed', 'false_positive', 'missed')", name="feedback_label"
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid()
+    analysis_id: Mapped[UUID] = mapped_column(ForeignKey("analysis_run.id", ondelete="CASCADE"))
+    trigger_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    label: Mapped[str] = mapped_column(String(32), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
