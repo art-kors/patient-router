@@ -25,6 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # config/ — данные, а не код: без него в образе не будет routing_matrix.json,
 # и первая же попытка принять решение упадёт (см. app/settings.py).
 COPY app ./app
+COPY doc_processing ./doc_processing
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 COPY config ./config
@@ -57,6 +58,7 @@ WORKDIR /app
 # venv целиком из сборочного слоя — нативные библиотеки совпадают
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 COPY --from=builder --chown=appuser:appuser /app/app /app/app
+COPY --from=builder --chown=appuser:appuser /app/doc_processing /app/doc_processing
 COPY --from=builder --chown=appuser:appuser /app/alembic /app/alembic
 COPY --from=builder --chown=appuser:appuser /app/alembic.ini /app/alembic.ini
 # settings.routing_matrix_path = "config/routing_matrix.json", WORKDIR=/app
