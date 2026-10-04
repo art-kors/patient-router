@@ -33,9 +33,15 @@ def pulse():
     return FileResponse(STATIC / "pulse.html")
 
 
+@router.get("/admin", include_in_schema=False)
+def admin():
+    """Настройки правил и оценка качества для администратора."""
+    return FileResponse(STATIC / "admin.html")
+
+
 @router.get("/", include_in_schema=False)
 def index():
-    """Главная страница дашборда."""
+    """Стартовая страница с выбором роли."""
     return FileResponse(STATIC / "index.html")
 
 
