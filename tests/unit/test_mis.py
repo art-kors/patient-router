@@ -139,11 +139,11 @@ def stored_delivery(delivery):
     )
 
 
-async def test_все_12_типов_в_справочнике(client):
+async def test_все_13_типов_в_справочнике(client):
     response = await client.get("/api/v1/mis/event-types")
     assert response.status_code == 200
     entries = response.json()
-    assert len(entries) == 12
+    assert len(entries) == 13
     assert {entry["event_type"] for entry in entries} == set(EVENT_TYPES)
     assert all(entry["description"] for entry in entries)
 

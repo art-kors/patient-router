@@ -5,6 +5,7 @@
 """
 
 from datetime import date, datetime
+from typing import Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -233,17 +234,9 @@ async def read_message(
 async def banner(patient_id: UUID, session: AsyncSession = Depends(get_session)):
     """Напоминает о любом незавершённом маршруте, включая визит через два месяца."""
     await require_patient(session, patient_id)
-    routes = (
-        await session.scalars(open_routes(patient_id).order_by(Route.created_at, Route.id))
-    ).all()
-    if not routes:
-        return BannerOut(visible=False)
-    return BannerOut(
-        visible=True,
-        title="Незавершённый клинический маршрут",
-        text="У вас остались рекомендованные шаги лечения. Свяжитесь с клиникой, чтобы продолжить.",
-        route_ids=[route.id for route in routes],
-    )
+    from app.services.banners import unfinished_banner
+
+    return BannerOut(**await unfinished_banner(session, patient_id))
 
 
 @router.get("/{patient_id}/route", response_model=PatientRouteOut | None)
@@ -326,3 +319,36 @@ async def patient_route(patient_id: UUID, session: AsyncSession = Depends(get_se
             for step in steps
         ],
     )
+
+
+class BannerResponseIn(BaseModel):
+    """Ответ пациента на напоминание о незавершённом маршруте."""
+
+    action: Literal["already_attended", "wants_booking"]
+
+
+@router.post("/{patient_id}/banner/{route_id}/response")
+async def respond_to_banner(
+    patient_id: UUID,
+    route_id: UUID,
+    answer: BannerResponseIn,
+    session: AsyncSession = Depends(get_session),
+):
+    """Записать ответ пациента, проверив принадлежность маршрута."""
+    from app.services.routing import RoutingService, RoutingTransitionError
+    from app.services.timers import TimerEngine
+
+    await require_patient(session, patient_id)
+    route = await session.get(Route, route_id)
+    if route is None or route.patient_id != patient_id:
+        raise HTTPException(status_code=404, detail="Маршрут не найден")
+    target = "closed_by_patient" if answer.action == "already_attended" else "booked"
+    try:
+        await RoutingService().transition(
+            session, route_id, target, "patient", "Ответ пациента на баннер"
+        )
+    except RoutingTransitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await TimerEngine().cancel_for_route(session, route_id)
+    await session.commit()
+    return {"route_id": str(route_id), "status": target}

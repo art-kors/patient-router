@@ -80,6 +80,8 @@ TRANSITIONS = {
     "discharged": {"followup_scheduled"},
     "followup_scheduled": {"followup_done", "closed_by_patient"},
     **{status: set() for status in TERMINAL_STATUSES},
+    # Автоконтакты исчерпаны, но новый ответ пациента может возобновить маршрут.
+    "route_not_realized": {"booked", "closed_by_patient"},
 }
 _CLOSE_REASONS = {
     "route_not_realized": CloseReason.NOT_REALIZED,
@@ -246,6 +248,9 @@ class RoutingService:
         for name, value in fields.items():
             if name not in {"tactics", "comment"}:
                 setattr(route, name, value)
+        if route.status == "route_not_realized":
+            route.closed_at = None
+            route.close_reason = None
         route.status = to_status
         if to_status in TERMINAL_STATUSES:
             route.closed_at = now
