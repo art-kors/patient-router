@@ -79,6 +79,10 @@ services:
       # исходники монтируются, зависимости живут в образе
       - ./app:/app/app
       - ./infra:/app/infra:ro
+      # матрица маршрутизации — тоже данные: монтируем read-only,
+      # чтобы правка routing_matrix.json подхватывалась без пересборки.
+      # В prod-образ config запечён на этапе сборки (см. Dockerfile).
+      - ./config:/app/config:ro
     depends_on:
       db:
         condition: service_healthy
