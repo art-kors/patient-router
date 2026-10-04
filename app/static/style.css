@@ -2,3 +2,8 @@
 .site-nav{flex-wrap:wrap}.site-nav a{color:#15496c;padding:9px 12px;background:white;border:1px solid #b8c8d6;border-radius:7px;text-decoration:none}.site-nav a:focus-visible{outline:3px solid #46a5d0;outline-offset:2px}
 
 body[data-page=analytics] section{margin-bottom:20px}body[data-page=analytics] .card strong{font-size:24px;overflow-wrap:anywhere}body[data-page=analytics] details{border-bottom:1px solid #dce5ed;padding:14px 0}body[data-page=analytics] details div{padding:8px 0}body[data-page=analytics] meter{display:block;width:100%;max-width:500px;height:24px}
+
+/* Ориентиры и карта ролей остаются читаемыми на узком экране. */
+body{font-size:17px}p,small,footer{color:#405267}main>section{margin-bottom:20px}.orientation{border-left:5px solid #145e85}.role-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.role-grid article{border:1px solid #b8c8d6;padding:20px;border-radius:8px}.role-grid h3{margin-top:0}a{color:#15496c}a:focus-visible,summary:focus-visible{outline:3px solid #145e85;outline-offset:3px}.primary-link{display:inline-block;padding:12px;background:#145e85;color:white;border-radius:6px}summary{cursor:pointer;font-weight:700;padding:14px 0}.section-details{margin-bottom:20px}#quality-summary{font-size:24px;font-weight:700;color:#203246}.card strong{font-size:25px}nav{flex-wrap:wrap}@media(max-width:760px){.role-grid,.cards{grid-template-columns:1fr}}
+
+.other-sections{position:relative}.other-sections summary{padding:9px 12px;border:1px solid #b8c8d6;border-radius:7px;background:white;color:#15496c}.section-links{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0}.site-nav{align-items:flex-start}.other-sections[open]{flex:1 1 100%}

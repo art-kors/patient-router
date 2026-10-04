@@ -17,10 +17,22 @@ class Elements(HTMLParser):
     def __init__(self, html):
         super().__init__()
         self.elements = []
+        self.heading_parts = []
+        self.in_heading = False
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
         self.elements.append((tag, dict(attrs)))
+        if tag == "h1":
+            self.in_heading = True
+
+    def handle_endtag(self, tag):
+        if tag == "h1":
+            self.in_heading = False
+
+    def handle_data(self, data):
+        if self.in_heading:
+            self.heading_parts.append(data)
 
 
 PAGE_ELEMENTS = {
@@ -32,7 +44,8 @@ PAGE_ELEMENTS = {
         "runs": "div",
         "compare": "button",
     },
-    "/": {
+    "/": {"role-choice": "section"},
+    "/admin": {
         "cards": "div",
         "confusion": "div",
         "trigger-list": "div",
@@ -80,7 +93,7 @@ async def test_page_contract(client, path):
         matches = [(t, attrs) for t, attrs in elements if attrs.get("id") == identifier]
         assert len(matches) == 1, identifier
         assert matches[0][0] == tag, identifier
-    if path != "/":
+    if path not in ("/", "/admin"):
         assert ("body", {"data-page": path[1:]}) in elements
         banner = [attrs for _, attrs in elements if attrs.get("id") == "unfinished-banner"]
         if banner:
@@ -91,21 +104,22 @@ async def test_page_contract(client, path):
 async def test_page_resources_and_navigation(client, path):
     """Скрипт запускается через defer, ресурсы доступны, переходы ведут на все страницы."""
     elements = Elements((await client.get(path)).text).elements
-    script = {"/": "dashboard.js", "/analytics": "analytics.js"}.get(path, "clinical.js")
-    assert any(
-        tag == "script" and attrs.get("src") == f"/static/{script}" and "defer" in attrs
-        for tag, attrs in elements
-    )
+    script = {"/admin": "dashboard.js", "/analytics": "analytics.js"}.get(path, "clinical.js")
+    if path != "/":
+        assert any(
+            tag == "script" and attrs.get("src") == f"/static/{script}" and "defer" in attrs
+            for tag, attrs in elements
+        )
     styles = {
         attrs.get("href")
         for tag, attrs in elements
         if tag == "link" and attrs.get("rel") == "stylesheet"
     }
     assert "/static/style.css" in styles
-    if path not in ("/", "/analytics"):
+    if path not in ("/", "/admin", "/analytics"):
         assert "/static/clinical.css" in styles
     assert set(PAGE_ELEMENTS) <= {attrs.get("href") for tag, attrs in elements if tag == "a"}
-    for resource in styles | {f"/static/{script}"}:
+    for resource in styles | ({f"/static/{script}"} if path != "/" else set()):
         assert (await client.get(resource)).status_code == 200
 
 
@@ -200,3 +214,24 @@ async def test_allowlist_cannot_authorize_traversal(client, monkeypatch, tmp_pat
     monkeypatch.setattr(ui, "STATIC_FILES", ui.STATIC_FILES | {filename})
     response = await client.get("/static/" + filename.replace("/", "%2f"))
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize("path", PAGE_ELEMENTS)
+async def test_page_orientation(client, path):
+    """Без заголовка и возврата к выбору роли страница не помогает ориентироваться."""
+    response = await client.get(path)
+    parser = Elements(response.text)
+    assert any(tag == "h1" for tag, _ in parser.elements)
+    assert "Назад к выбору роли" in response.text
+    assert any(tag == "a" and attrs.get("href") == "/" for tag, attrs in parser.elements)
+    assert "orientation" in response.text
+    assert len("".join(parser.heading_parts).strip()) >= 10
+    assert any("а" <= letter.lower() <= "я" for letter in "".join(parser.heading_parts))
+
+
+async def test_role_choices(client):
+    """Старт объясняет все роли и предлагает начать с истории пациента."""
+    html = (await client.get("/")).text
+    for label in ("Я пациент", "Я врач", "Я координатор", "Я администратор"):
+        assert label in html
+    assert "Посмотреть историю пациента" in html

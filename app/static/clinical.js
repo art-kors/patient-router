@@ -2,6 +2,8 @@
 // Все данные сервера вставляются как текст, без интерпретации HTML.
 const $ = id => document.getElementById(id);
 const page = document.body.dataset.page;
+// Названия событий объясняют произошедшее, технические коды остаются в запросах.
+const eventNames = {VisitStarted:'Начался приём', StudyProtocolSigned:'Протокол исследования подписан', StudyProtocolCorrected:'Протокол исправлен', StudyProtocolCancelled:'Протокол отменён', AppointmentBooked:'Пациент записан на приём', AppointmentCancelled:'Запись на приём отменена', VisitCompleted:'Приём завершён', VisitNoShow:'Пациент не пришёл', TacticsChosen:'Врач выбрал дальнейшие действия', HospitalizationScheduled:'Госпитализация запланирована', HospitalizationFactual:'Пациент госпитализирован', SurgeryPerformed:'Операция выполнена', Discharged:'Пациент выписан'};
 let patients = [], selectedId = '', route = null, banner = null, delivery = null;
 let busy = false, modelClock = false;
 const date = value => value ? new Date(value).toLocaleString('ru-RU') : 'Дата не назначена';
@@ -20,10 +22,10 @@ async function api(path, body) {
       signal: controller.signal,
       ...(body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => { throw new Error('Сервер вернул непонятный ответ. Повторите действие.'); });
     if (!response.ok) {
       const detail = data.detail ?? data;
-      throw new Error(typeof detail === 'string' ? detail : detail.message ?? JSON.stringify(detail));
+      throw new Error(typeof detail === 'string' ? detail : 'Не удалось выполнить действие. Проверьте данные и повторите.');
     }
     return data;
   } catch (error) {
@@ -40,8 +42,8 @@ async function run(action) {
   controls.forEach(el => { el.disabled = true; });
   $('clinical-status').className = '';
   $('clinical-status').textContent = 'Загрузка…';
-  try { await action(); $('clinical-status').textContent = 'Готово.'; }
-  catch (error) { $('clinical-status').className = 'failure'; $('clinical-status').textContent = error.message; }
+  try { await action(); $('clinical-status').textContent = page === 'pulse' ? 'Данные загружены. Выберите событие и отправьте его или проверьте ленту ниже.' : selectedId ? 'Пациент открыт. Проверьте рекомендации и следующий шаг ниже.' : page === 'doctor' ? 'Выберите пациента и нажмите «Новый визит».' : 'Выберите пациента и нажмите «Открыть пациента».'; }
+  catch (error) { $('clinical-status').className = 'failure'; $('clinical-status').textContent = error instanceof SyntaxError ? 'Проверьте дополнительные данные события: нужен корректный объект данных JSON.' : error.message; }
   finally {
     controls.forEach((el, i) => { el.disabled = disabled[i]; });
     document.querySelectorAll('[data-hours]').forEach(el => { el.disabled = !modelClock; });
@@ -50,7 +52,7 @@ async function run(action) {
 }
 function patientId() {
   const id = $('patient-id').value.trim() || $('patient-select').value;
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error('Выберите пациента или введите корректный UUID.');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error('Выберите пациента или введите идентификатор из каталога.');
   return id;
 }
 function renderBanner(value) {
@@ -62,7 +64,7 @@ function renderBanner(value) {
 function renderRoute(value) {
   const el = $('patient-route');
   $('route-actions').replaceChildren();
-  if (!value) { show('patient-route', 'План лечения пока не создан.'); return; }
+  if (!value) { show('patient-route', 'План пока не создан. Если ожидаете рекомендации, обратитесь к врачу; в демонстрации координатор может передать подписанный протокол.'); return; }
   const dl = node('dl');
   for (const [title, text] of [['Что случилось', value.what_happened], ['Что делать дальше', value.what_to_do], ['Когда следующий шаг', `${value.next_step_text} ${value.next_step_at ? date(value.next_step_at) : ''}`]]) {
     dl.append(node('dt', title), node('dd', text));
@@ -101,7 +103,7 @@ function renderRoute(value) {
 }
 function renderMessages(messages) {
   const el = $('messages'); el.replaceChildren();
-  if (!messages.length) { show('messages', 'Сообщений пока нет.'); return; }
+  if (!messages.length) { show('messages', 'Сообщений пока нет. Рекомендации и напоминания появятся после создания плана.'); return; }
   messages.forEach(message => {
     const item = node('article', undefined, 'message');
     item.append(node('small', date(message.date)), node('p', message.text), node('span', message.read ? 'Прочитано' : 'Не прочитано', 'badge'));
@@ -117,7 +119,7 @@ async function loadPatient(id, visitBanner) {
   selectedId = id; route = null; banner = null;
   show('patient-route', 'Загрузка плана…'); $('route-actions').replaceChildren();
   if (page === 'patient') show('messages', 'Загрузка сообщений…');
-  renderBanner(visitBanner);
+  if (visitBanner === undefined) show('unfinished-banner', 'Проверяем рекомендации пациента…'); else renderBanner(visitBanner);
   const base = `/api/v1/mock/lk/${id}`;
   try {
     const results = await Promise.all([api(base + '/route'), visitBanner === undefined ? api(base + '/banner') : Promise.resolve(visitBanner), page === 'patient' ? api(base + '/messages') : Promise.resolve([])]);
@@ -157,7 +159,7 @@ async function refreshFeed() {
   if (!queue.recent_events.length) el.append(node('p', 'Событий пока нет. Начните с подписанного протокола исследования.'));
   queue.recent_events.forEach(event => {
     const item = node('article', undefined, 'feed-item');
-    item.append(node('strong', event.event_type), node('p', `${date(event.occurred_at)} · ${event.event_id}`), node('p', event.processed_at ? `Обработано: ${date(event.processed_at)}` : 'Ожидает обработки'));
+    item.append(node('strong', $('event-type').querySelector(`option[value="${event.event_type}"]`)?.textContent || 'Событие медицинской системы'), node('p', `${date(event.occurred_at)} · ${event.event_id}`), node('p', event.processed_at ? `Обработано: ${date(event.processed_at)}` : 'Ожидает обработки'));
     const raw = node('details'); raw.append(node('summary', 'Что пришло'), node('pre', JSON.stringify(event.payload, null, 2))); item.append(raw); el.append(item);
   });
 }
@@ -165,13 +167,13 @@ async function refreshClock() {
   let clock;
   try { clock = await api('/api/v1/demo/clock'); }
   catch (error) { $('clock').textContent = 'Не удалось получить время сервера. Повторите загрузку страницы.'; modelClock = false; throw error; }
-  $('clock').textContent = `${clock.is_mock ? 'Модельное' : 'Системное'} время: ${date(clock.now)}.${clock.is_mock ? '' : ' Для прокрутки требуется USE_MODEL_CLOCK=true.'}`;
+  $('clock').textContent = `${clock.is_mock ? 'Модельное' : 'Системное'} время: ${date(clock.now)}.${clock.is_mock ? '' : ' Прокрутка отключена: сервер использует реальное время. Для демонстрации включите модельные часы в настройках запуска.'}`;
   modelClock = clock.is_mock;
   document.querySelectorAll('[data-hours]').forEach(button => { button.disabled = !modelClock; });
 }
 async function initPulse() {
   const types = await api('/api/v1/mis/event-types');
-  types.forEach(type => { const option = node('option', type.event_type); option.value = type.event_type; option.dataset.description = type.description; $('event-type').append(option); });
+  types.forEach(type => { const option = node('option', eventNames[type.event_type] || 'Событие медицинской системы'); option.value = type.event_type; option.dataset.description = type.event_type === 'StudyProtocolSigned' ? 'Система прочитает подписанный протокол и при необходимости создаст план дальнейших действий для пациента.' : type.description; $('event-type').append(option); });
   $('event-type').value = 'StudyProtocolSigned';
   const describe = () => { $('event-description').textContent = $('event-type').selectedOptions[0]?.dataset.description || ''; };
   describe(); updateStudies(); resetDelivery();
@@ -189,17 +191,17 @@ async function initPulse() {
         delivery.body.study_id = study.study_id;
       }
     }
-    $('delivery-id').textContent = `ID доставки: ${delivery.body.event_id}. Повторная отправка использует тот же факт.`;
+    $('delivery-id').textContent = `Идентификатор доставки: ${delivery.body.event_id}. Повторная отправка использует тот же факт.`;
     const result = await api(`/api/v1/mock/mis/emit/${encodeURIComponent(delivery.type)}`, delivery.body);
-    const text = result.duplicate ? 'Повторная доставка · duplicate: да. Повторные действия не выполнялись.' : `Новая доставка · duplicate: нет. Действия: ${(result.actions || []).join(', ') || 'Изменений маршрута нет'}.`;
+    const text = result.duplicate ? 'Повторная доставка. Повторные действия не выполнялись.' : `Новая доставка. Обработка завершена. Проверьте план в кабинете пациента; технические действия перечислены в подробностях.`;
     details('delivery-result', result, text);
-    $('session-feed').prepend(node('p', `${delivery.type} · ${delivery.body.event_id} · ${text}`));
+    $('session-feed').prepend(node('p', `${eventNames[delivery.type] || 'Событие медицинской системы'} · ${delivery.body.event_id} · ${text}`));
     await refreshFeed();
   });
   $('refresh-feed').onclick = () => run(refreshFeed);
   document.querySelectorAll('[data-hours]').forEach(button => { button.onclick = () => run(async () => {
     const result = await api('/api/v1/demo/clock/advance', {hours: Number(button.dataset.hours)});
-    details('time-result', result, `${date(result.from)} → ${date(result.to)}. Сработало таймеров: ${result.fired.length}. Отправлено сообщений: ${result.notifications}. Выполнено за ${result.elapsed_ms} мс.${result.database === 'unavailable' ? ' База недоступна: эффекты не сохранены.' : ''}`);
+    details('time-result', result, `${date(result.from)} → ${date(result.to)}. Сработало таймеров: ${result.fired.length}. Отправлено сообщений: ${result.notifications}. Выполнено за ${Math.round(result.elapsed_ms)} мс.${result.database === 'unavailable' ? ' База недоступна: эффекты не сохранены.' : ''}`);
     await refreshClock(); await refreshFeed();
   }); });
   $('analyze').onclick = () => run(async () => {
@@ -207,11 +209,11 @@ async function initPulse() {
     const result = await api('/api/v1/analyze', {text: study.text, study_type: study.study_type});
     const decoder = result.decoder_used ?? result.extractor;
     const rules = decoder && /rules|dictionary|regex/i.test(decoder);
-    const source = rules ? 'Анализ выполнен правилами, без модели.' : decoder ? `Источник анализа: ${decoder}.` : 'Сервер не сообщил источник анализа; работа модели не подтверждена.';
-    details('analysis-result', result, `${source} Решение о маршрутизации принимают правила. ${result.llm_error ? 'Ошибка модели: ' + result.llm_error + '.' : ''} ${result.decoder_used === undefined ? 'В этой версии API поле decoder_used отсутствует; использовано поле extractor.' : ''} ${result.is_emergency ? result.emergency_notice : result.route_would_be_created ? 'Рекомендован маршрут: ' + result.winning_trigger : 'Автоматический маршрут не рекомендован.'}`);
+    const source = rules ? 'Анализ выполнен правилами, без модели.' : decoder ? 'Анализ выполнен моделью.' : 'Сервер не сообщил источник анализа; работа модели не подтверждена.';
+    details('analysis-result', result, `${source} Решение о маршрутизации принимают правила. ${result.llm_error ? 'Модель недоступна; проверьте источник результата в подробностях.' : ''} ${result.is_emergency ? result.emergency_notice : result.route_would_be_created ? 'Рекомендован маршрут: ' + result.winning_trigger : 'Автоматический маршрут не рекомендован.'}`);
   });
   const results = await Promise.allSettled([refreshFeed(), refreshClock(), api('/api/v1/demo/scenarios').then(items => {
-    $('scenarios').replaceChildren(); items.forEach(item => { const article = node('article', undefined, 'feed-item'); article.append(node('h3', item.name), node('p', item.description), node('p', 'Прокрутка: ' + item.expected_advance)); $('scenarios').append(article); });
+    $('scenarios').replaceChildren(); if (!items.length) show('scenarios', 'Сценариев пока нет. Для проверки отправьте событие и прокрутите модельное время.'); items.forEach(item => { const article = node('article', undefined, 'feed-item'); article.append(node('h3', item.name), node('p', item.description), node('p', 'Прокрутка: ' + item.expected_advance)); $('scenarios').append(article); });
   }).catch(error => { show('scenarios', 'Не удалось загрузить сценарии. Повторите загрузку страницы.'); throw error; })]);
   const failures = results.filter(result => result.status === 'rejected');
   if (failures.length) throw new Error(failures.map(result => result.reason.message).join('\n'));
@@ -260,9 +262,9 @@ run(async () => {
     $('patient-select').replaceChildren(node('option', 'Выберите пациента'));
     $('patient-select').firstChild.value = '';
     patients.forEach(patient => { const option = node('option', `${patient.name} · ${patient.age} лет · ${patient.external_id}`); option.value = patient.patient_id; $('patient-select').append(option); });
-    if (!patients.length) $('patient-select').firstChild.textContent = 'Каталог пуст — введите ID';
+    if (!patients.length) $('patient-select').firstChild.textContent = 'Пациентов пока нет — запросите демонстрационные данные';
   } catch (error) {
-    $('patient-select').replaceChildren(node('option', 'Каталог недоступен — введите ID'));
+    $('patient-select').replaceChildren(node('option', 'Каталог недоступен — повторите загрузку'));
     $('patient-select').firstChild.value = '';
     if (page !== 'pulse') throw error;
   }
