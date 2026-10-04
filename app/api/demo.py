@@ -23,6 +23,7 @@ import app.clock as clock_module
 from app.clock import ModelClock
 from app.db import get_session
 from app.models import Timer
+from app.services.notifications import deliver_effects
 from app.services.timers import TimerEngine
 
 router = APIRouter(prefix="/api/v1/demo", tags=["demo"])
@@ -141,6 +142,12 @@ async def _advance(hours: float, session: AsyncSession) -> tuple[dict[str, Any],
     (:func:`_persist`). База нужна только ради записанных таймеров: если её
     нет, модельное время двигается по слушателям часов, и показ продолжается.
 
+    Эффекты движка уходят в доставку здесь, а не внутри ``TimerEngine``:
+    движок не знает про каналы и не держит сессию, а решение о доставке
+    принимает слой, который владеет транзакцией. Доставка выполняется ДО
+    коммита и в той же сессии, поэтому отметка ``timer.fired`` и сообщение
+    пациенту либо сохраняются вместе, либо откатываются вместе.
+
     Второе значение ответа — была ли база пригодна для записи таймеров.
     """
     usable = await db_available(session)
@@ -160,12 +167,16 @@ async def _advance(hours: float, session: AsyncSession) -> tuple[dict[str, Any],
         raise HTTPException(422, detail="Интервал выходит за допустимый диапазон времени") from exc
     except OverflowError as exc:
         raise HTTPException(422, detail="Интервал выходит за допустимый диапазон времени") from exc
+    # Доставка сама отбрасывает не-Effect: слушающие часы возвращают в
+    # ``fired`` произвольные объекты, а в notification они не превращаются.
+    delivered = await deliver_effects(session, result["fired"])
     return {
         "from": result["from"],
         "to": result["to"],
         "fired": list(result["fired"]),
         "routes_affected": result["routes_affected"],
         "elapsed_ms": result["elapsed_ms"],
+        "notifications": len(delivered),
         "database": "ok" if usable else "unavailable",
     }, usable
 

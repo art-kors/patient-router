@@ -113,6 +113,10 @@ jobs:
         POSTGRES_PASSWORD: test_password
         ENVIRONMENT: test
       run: uv run alembic upgrade head && uv run alembic check
+    - name: Проверить число таблиц, готовность схемы и демо-сид
+      env:
+        TEST_DATABASE_URL: postgresql+asyncpg://pr:test_password@localhost:5432/patient_router_test
+      run: uv run pytest --no-header --no-cov -p no:cacheprovider tests/integration/test_migrations.py
     - name: Проверить обратимость (downgrade + upgrade)
       env:
         POSTGRES_HOST: localhost
@@ -147,6 +151,14 @@ jobs:
   smoke:
     name: 'E2E-smoke: БД и приложение'
     runs-on: ubuntu-latest
+    # Джоба получает отдельный runner: фиксированные порты не пересекаются
+    # со стендами разработчиков. APP_PORT совпадает с адресом проверки /ready.
+    # Compose требует все четыре порта даже для неактивных профилей.
+    env:
+      POSTGRES_PORT: '5433'
+      APP_PORT: '8000'
+      DEV_PORT: '8001'
+      DEMO_PORT: '8010'
     steps:
     - uses: actions/checkout@v4
     - run: docker compose up -d --build db app
@@ -159,11 +171,18 @@ jobs:
       name: Применить миграции
     - name: Проверить, что схема создана
       run: 'TABLES=$(docker compose exec -T db psql -U pr -d patient_router -tAc "SELECT count(*) FROM
-        information_schema.tables WHERE table_schema=''public'' AND table_type=''BASE TABLE''")
+        information_schema.tables WHERE table_schema=''public'' AND table_type=''BASE TABLE'' AND table_name <> ''alembic_version''")
 
         echo "таблиц: $TABLES"
 
-        test "$TABLES" -ge 20'
+        test "$TABLES" -eq 20'
+    - name: Проверить демо-сид внутри непривилегированного контейнера
+      run: |
+        docker compose exec -T app python -m scripts.seed_demo
+        docker compose exec -T app python -m scripts.seed_demo
+        COUNT=$(docker compose exec -T db psql -U pr -d patient_router -tAc "SELECT count(*) FROM protocol")
+        echo "Демо-протоколов: $COUNT"
+        test "$COUNT" -eq 89
     - run: docker compose down -v
       if: always()
       name: Остановить стек

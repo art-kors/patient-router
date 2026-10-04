@@ -29,6 +29,8 @@ COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 COPY config ./config
 COPY scripts ./scripts
+# Синтетические протоколы нужны сиду внутри контейнера.
+COPY data/demo/protocols ./data/demo/protocols
 COPY README.md ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
@@ -61,6 +63,8 @@ COPY --from=builder --chown=appuser:appuser /app/alembic.ini /app/alembic.ini
 # → матрица обязана лежать по пути /app/config/routing_matrix.json
 COPY --from=builder --chown=appuser:appuser /app/config /app/config
 COPY --from=builder --chown=appuser:appuser /app/scripts /app/scripts
+# Каталог индекса доступен непривилегированному пользователю.
+COPY --from=builder --chown=appuser:appuser /app/data/demo /app/data/demo
 
 USER appuser
 

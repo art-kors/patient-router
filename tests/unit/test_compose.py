@@ -183,13 +183,10 @@ class TestДемоСервис:
             "в окружении demo появился второй источник USE_MODEL_CLOCK"
         )
 
-    def test_у_демо_свой_порт_8010(self):
+    def test_у_демо_явно_заданный_порт(self):
         ports = _ports(ROOT_COMPOSE, "demo")
         assert ports, "у сервиса demo нет проброса порта — до него не достучаться с хоста"
-        assert "${DEMO_PORT:-8010}:8000" in ports, (
-            f"порты demo = {ports}. Ожидался проброс ${{DEMO_PORT:-8010}}:8000: "
-            "свой порт, иначе демо бьётся за 8000 с app."
-        )
+        assert ports[0].startswith("${DEMO_PORT:?"), ports
 
     def test_демо_не_делит_порт_с_app(self):
         def published(entries: list[str]) -> set[str]:
@@ -307,12 +304,29 @@ class TestПрочееНеСломалось:
             f"init-скрипты больше не монтируются в стенд БД: {mounts}"
         )
 
-    def test_стенд_бд_не_переехал_на_другой_порт(self):
-        """Стенд БД продолжает публиковать 5433 на хосте."""
-        ports = _ports(INFRA_COMPOSE, "db")
-        assert "${POSTGRES_PORT:-5433}:5432" in ports, f"порты БД в стенде: {ports}"
-
     def test_оба_compose_читаются(self):
         """Оба файла — валидный YAML (иначе compose их просто не примет)."""
         for path in COMPOSE_FILES:
             assert _load(path).get("services"), f"{path.name}: нет сервисов"
+
+
+@pytest.mark.parametrize("path", COMPOSE_FILES, ids=lambda p: str(p.relative_to(REPO_ROOT)))
+def test_публикуемые_порты_обязательны(path: Path):
+    """Любой дефолт или фиксированный порт возвращает конфликт соседних стендов."""
+    for name, spec in _services(path).items():
+        if spec.get("ports"):
+            assert spec.get("restart") == "no", f"{name}: ошибка порта уйдёт в рестарт-цикл"
+        for port in spec.get("ports", []):
+            assert isinstance(port, str), f"{name}: проверьте обязательность published"
+            assert re.fullmatch(r"\$\{[A-Z_]+:\?[^}]+\}:\d+", port), (
+                f"{path.name}/{name}: порт {port!r} должен требовать явного непустого значения"
+            )
+
+
+def test_демо_не_скрывает_ошибки_рестартами():
+    """Ошибка запуска сохраняется, а готовность требует рабочей схемы."""
+    demo = _service(ROOT_COMPOSE, "demo")
+    assert demo["restart"] == "no"
+    assert demo["healthcheck"]["test"] == ["CMD", "curl", "-fsS", "http://localhost:8000/ready"]
+    assert demo["healthcheck"]["retries"] == 1
+    assert demo["healthcheck"]["start_period"] == "0s"

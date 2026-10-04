@@ -1,11 +1,13 @@
 """Служебные ручки: проверка живости и готовности БД."""
 
 from fastapi import APIRouter, Depends, Response, status
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clock import get_clock
 from app.db import get_session
+from app.models import Base
+from app.schema_check import schema_errors
 from app.settings import Settings, get_settings
 
 router = APIRouter()
@@ -29,15 +31,54 @@ async def ready(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> dict:
-    """Готовность: приложение живо И БД отвечает."""
+    """Готовность: БД отвечает, миграции на head, таблицы и колонки доступны."""
     try:
         await session.execute(text("SELECT 1"))
-    except Exception as exc:
+    except Exception:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return {"status": "not_ready", "database": "down", "error": str(exc)[:200]}
+        return {"status": "not_ready", "database": "down", "error": "БД недоступна"}
+
+    try:
+        errors = await session.run_sync(
+            lambda sync_session: schema_errors(
+                sync_session.connection(), settings.alembic_target_schema or "public"
+            )
+        )
+    except Exception:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {
+            "status": "not_ready",
+            "database": "up",
+            "schema": "unavailable",
+            "error": "Не удалось проверить миграции и таблицы БД",
+        }
+
+    if errors:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {
+            "status": "not_ready",
+            "database": "up",
+            "schema": "unavailable",
+            "error": "; ".join(errors),
+        }
+
+    try:
+        # Метка Alembic сама по себе не доказывает наличие схемы.
+        # LIMIT 0 проверяет таблицы и колонки без чтения данных пациентов.
+        for table in Base.metadata.sorted_tables:
+            await session.execute(select(table).limit(0))
+    except Exception:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {
+            "status": "not_ready",
+            "database": "up",
+            "schema": "unavailable",
+            "error": "Таблицы или колонки схемы БД недоступны",
+        }
 
     return {
         "status": "ready",
+        "schema": "up",
         "database": "up",
         "environment": settings.environment,
     }

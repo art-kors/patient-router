@@ -7,7 +7,7 @@
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -165,3 +165,28 @@ async def send_effect(
 ) -> Notification:
     """Отправляет один эффект с актуальной конфигурацией шаблонов."""
     return await NotificationService().send_effect(session, effect, context)
+
+
+async def deliver_effects(
+    session: AsyncSession, effects: Iterable[Effect], context: Mapping[str, str] | None = None
+) -> list[Notification]:
+    """Отправляет пачку эффектов в транзакции вызывающего кода.
+
+    Единственная точка, где эффект таймера превращается в сообщение пациенту
+    или задачу координатору. Живёт в сервисном слое рядом с движком, а не
+    внутри ``TimerEngine``: движок не знает про каналы доставки, но любой его
+    вызов обязан пройти через эту функцию.
+
+    Не-``Effect`` отбрасываются: слушатели ``ModelClock`` возвращают в
+    ``fired`` произвольные объекты, и доставка не должна разбирать их как
+    эффекты.
+
+    Коммита здесь нет намеренно. Отметка ``timer.fired`` и сообщение должны
+    уйти одной транзакцией вызывающего кода — иначе откат погасит сообщение,
+    а отметка останется, и пациент получит напоминание дважды.
+    """
+    return [
+        await send_effect(session, effect, context)
+        for effect in effects
+        if isinstance(effect, Effect)
+    ]
