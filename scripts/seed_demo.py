@@ -56,11 +56,15 @@ def parse_protocol(text: str) -> dict:
 
 
 async def upsert_demo(session: AsyncSession) -> dict[str, str]:
-    """Создать/обновить записи для всех 89 протоколов. Вернуть маппинг demo_id -> UUID."""
+    """Подготовить 89 протоколов без фиксации транзакции и вернуть маппинг demo_id → UUID."""
     index: dict[str, str] = {}
     created = updated = 0
 
-    for path in sorted(PROTOCOLS_DIR.glob("*.txt")):
+    paths = sorted(PROTOCOLS_DIR.glob("*.txt"))
+    if len(paths) != 89:
+        raise RuntimeError(f"Ожидалось 89 демо-протоколов в {PROTOCOLS_DIR}, найдено {len(paths)}")
+
+    for path in paths:
         text = path.read_text(encoding="utf-8")
         meta = parse_protocol(text)
         demo_id = meta["study_id"]
@@ -70,7 +74,7 @@ async def upsert_demo(session: AsyncSession) -> dict[str, str]:
         patient_uuid = uuid5(SEED_NS, f"patient:{meta['card']}")
         protocol_uuid = uuid5(SEED_NS, f"protocol:{demo_id}")
 
-        # Patient: upsert by external_id (card)
+        # Пациент: создать или обновить по номеру карты.
         card = meta["card"]
         patient = await session.scalar(select(Patient).where(Patient.external_id == card))
         if patient is None:
@@ -90,7 +94,7 @@ async def upsert_demo(session: AsyncSession) -> dict[str, str]:
                 patient.sex = meta["sex"]
                 updated += 1
 
-        # Study: upsert by id
+        # Исследование: создать или обновить по идентификатору.
         study = await session.get(Study, study_uuid)
         if study is None:
             # парсим дату приёма как study_date
@@ -113,7 +117,7 @@ async def upsert_demo(session: AsyncSession) -> dict[str, str]:
                 study.study_type = meta["study_type"]
                 updated += 1
 
-        # Protocol: upsert by id
+        # Протокол: создать или обновить по идентификатору.
         protocol = await session.get(Protocol, protocol_uuid)
         if protocol is None:
             visit_dt = datetime.strptime(meta["visit_date"], "%d.%m.%Y")
@@ -128,19 +132,29 @@ async def upsert_demo(session: AsyncSession) -> dict[str, str]:
         else:
             updated += 1
 
+        if demo_id in index:
+            raise RuntimeError(f"Повторный идентификатор демо-протокола: {demo_id}")
         index[demo_id] = str(study_uuid)
+        # Следующий протокол должен видеть пациентов, добавленных в этой транзакции.
+        await session.flush()
 
-    await session.commit()
-    print(f"Created: {created}, Updated: {updated}, Total protocols: {len(index)}")
+    print(f"Подготовлено новых записей: {created}, обновлений: {updated}, протоколов: {len(index)}")
     return index
 
 
 async def main() -> int:
     async with SessionFactory() as session:
         index = await upsert_demo(session)
-
-    INDEX_PATH.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Index written to {INDEX_PATH} ({len(index)} entries)")
+        # Ошибка записи индекса должна откатить сид, а не оставить неполное демо.
+        try:
+            INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+            INDEX_PATH.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+        except OSError as exc:
+            raise RuntimeError(
+                f"Не удалось записать индекс демо-протоколов в {INDEX_PATH}"
+            ) from exc
+        await session.commit()
+    print(f"Индекс записан в {INDEX_PATH} ({len(index)} записей)")
     return 0
 
 

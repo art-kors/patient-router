@@ -234,3 +234,33 @@ def test_resolve_study_ids_missing_raises() -> None:
 
     with pytest.raises(QualityDataError, match="не найден в индексе"):
         resolve_study_ids(samples, index)
+
+
+@pytest.mark.asyncio
+async def test_пустой_каталог_демо_вызывает_ошибку(monkeypatch, tmp_path):
+    """Отсутствующие входные файлы не должны превращаться в успешный пустой сид."""
+    from scripts import seed_demo
+
+    monkeypatch.setattr(seed_demo, "PROTOCOLS_DIR", tmp_path / "missing")
+    session = AsyncMock()
+    with pytest.raises(RuntimeError, match="Ожидалось 89.*найдено 0"):
+        await seed_demo.upsert_demo(session)
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_ошибка_записи_индекса_откатывает_сид(monkeypatch, tmp_path):
+    """Сбой файловой системы должен прервать запуск до фиксации данных."""
+    from scripts import seed_demo
+
+    session = AsyncMock()
+    factory = MagicMock()
+    factory.return_value.__aenter__.return_value = session
+    monkeypatch.setattr(seed_demo, "SessionFactory", factory)
+    monkeypatch.setattr(seed_demo, "upsert_demo", AsyncMock(return_value={"demo": "uuid"}))
+    occupied = tmp_path / "file"
+    occupied.write_text("Здесь нельзя создать каталог")
+    monkeypatch.setattr(seed_demo, "INDEX_PATH", occupied / "index.json")
+    with pytest.raises(RuntimeError, match="Не удалось записать индекс"):
+        await seed_demo.main()
+    session.commit.assert_not_awaited()

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 from app.models import Base
+from app.schema_check import migration_heads, schema_errors
 from app.settings import get_settings
 
 config = context.config
@@ -67,6 +68,11 @@ def do_run_migrations(connection: Connection) -> None:
     )
     with context.begin_transaction():
         context.run_migrations()
+        # Отметка head сама по себе не доказывает, что DDL был выполнен.
+        if set(context.get_context().get_current_heads()) == migration_heads():
+            errors = schema_errors(connection, target_schema or "public")
+            if errors:
+                raise RuntimeError("Проверка схемы после миграций: " + "; ".join(errors))
 
 
 async def run_async_migrations() -> None:

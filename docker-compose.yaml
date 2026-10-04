@@ -63,6 +63,13 @@ services:
       db:
         # ждём не просто старта, а успешного pg_isready
         condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        alembic upgrade head
+        exec uvicorn app.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
 
   # ── demo: прод-образ + модельное время, одна команда ──────
@@ -74,8 +81,8 @@ services:
   # 409 CLOCK_NOT_MOCK. Здесь значение жёстко задано в compose, а порт
   # свой (8010), чтобы не драться с app на 8000.
   #
-  # Единственный сервис, который сам накатывает миграции при старте:
-  # это одноразовый стенд, иначе жюри получит 500 на первом же
+  # Как и app, накатывает миграции перед запуском сервера:
+  # иначе жюри получит 500 на первом же
   # POST /api/v1/demo/clock/advance (в БД нет таймеров).
   demo:
     profiles: ["demo"]
