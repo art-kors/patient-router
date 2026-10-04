@@ -170,19 +170,12 @@ jobs:
     - run: docker compose exec -T app alembic upgrade head
       name: Применить миграции
     - name: Проверить, что схема создана
-      run: 'TABLES=$(docker compose exec -T db psql -U pr -d patient_router -tAc "SELECT count(*) FROM
-        information_schema.tables WHERE table_schema=''public'' AND table_type=''BASE TABLE'' AND table_name <> ''alembic_version''")
-
-        echo "таблиц: $TABLES"
-
-        test "$TABLES" -eq 20'
+      run: docker compose exec -T app python -m scripts.check_schema
     - name: Проверить демо-сид внутри непривилегированного контейнера
       run: |
         docker compose exec -T app python -m scripts.seed_demo
         docker compose exec -T app python -m scripts.seed_demo
-        COUNT=$(docker compose exec -T db psql -U pr -d patient_router -tAc "SELECT count(*) FROM protocol")
-        echo "Демо-протоколов: $COUNT"
-        test "$COUNT" -eq 89
+        docker compose exec -T app python -m scripts.check_demo_seed
     - run: docker compose down -v
       if: always()
       name: Остановить стек

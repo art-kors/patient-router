@@ -8,6 +8,7 @@ from fastapi import FastAPI
 
 from app.api.admin import router as admin_router
 from app.api.analysis import router as analysis_router
+from app.api.analytics import router as analytics_router
 from app.api.demo import router as demo_router
 from app.api.health import router as health_router
 from app.api.mis import router as mis_router
@@ -92,6 +93,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router, tags=["service"])
     app.include_router(demo_router)
     app.include_router(analysis_router)
+    app.include_router(analytics_router)
     app.include_router(routes_router)
     app.include_router(mis_router)
     app.include_router(quality_router)

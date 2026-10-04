@@ -49,7 +49,7 @@ async def dashboard(monkeypatch):
 async def test_редактирование_отключение_и_откат(dashboard):
     client, _, _ = dashboard
     rows = (await client.get("/api/v1/admin/triggers")).json()
-    assert len(rows) == 10
+    assert len(rows) == len(load_triggers(MATRIX_PATH))
     identifier = rows[0]["trigger_id"]
     path = f"/api/v1/admin/triggers/{identifier}"
     assert (await client.get(path)).json()["synonyms"]
@@ -65,7 +65,7 @@ async def test_редактирование_отключение_и_откат(d
     assert response.json()["version"] == 4
     restored = (await client.get(path)).json()
     assert restored["enabled"] is True
-    assert restored["target_sla_days"] == 7
+    assert restored["target_sla_days"] == rows[0]["target_sla_days"]
 
 
 async def test_новый_триггер_сразу_распознаётся(dashboard):
@@ -106,7 +106,10 @@ async def test_новый_триггер_сразу_распознаётся(das
 )
 async def test_валидация_422_без_новой_версии(dashboard, patch):
     client, _, _ = dashboard
-    response = await client.put("/api/v1/admin/triggers/endometrial_polyp", json=patch)
+    response = await client.put(
+        "/api/v1/admin/triggers/podozrenie_na_polip_endometriya_i_polip_sheyki_matki_pokazanie_k_operatsii",
+        json=patch,
+    )
     assert response.status_code == 422
     assert response.json()["detail"]
     assert (await client.get("/api/v1/admin/versions")).json() == []
@@ -143,7 +146,7 @@ async def test_метрики_по_триггерам_и_фильтр_до_ли�
     monkeypatch.setattr(quality, "load_triggers", lambda: triggers)
     monkeypatch.setattr(quality, "_quality_triggers", lambda: triggers)
     rows = (await client.get("/api/v1/quality/metrics/by-trigger")).json()
-    assert len(rows) == 10
+    assert len(rows) == len(load_triggers(MATRIX_PATH))
     assert rows[0]["fn"] == 1 and rows[0]["recall"] == 0
     assert rows[2]["available"] is False
     response = await client.get(
@@ -191,7 +194,7 @@ async def test_отключённое_правило_считается_FN_а_н
     from app import db
 
     client, app, session = dashboard
-    identifier = "endometrial_polyp"
+    identifier = "podozrenie_na_polip_endometriya_i_polip_sheyki_matki_pokazanie_k_operatsii"
     await client.delete(f"/api/v1/admin/triggers/{identifier}")
     stored = session.sync.execute(
         select(versions.c.triggers).order_by(versions.c.version.desc())
@@ -228,4 +231,4 @@ async def test_отключённое_правило_считается_FN_а_н
     assert disabled["enabled"] is False and disabled["fn"] == 1
     response = await client.post("/api/v1/admin/reload")
     assert response.status_code == 200
-    assert response.json()["triggers"] == 9
+    assert response.json()["triggers"] == len(active)

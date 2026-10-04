@@ -68,7 +68,9 @@ async def test_история_сохраняет_исходник_и_все_сн
     assert [r["version"] for r in rows] == [3, 2, 1]
     assert rows[0]["triggers"][0]["enabled"] is False
     assert rows[1]["triggers"][0]["enabled"] is True
-    assert rows[2]["triggers"][0]["target_sla_days"] == 7
+    assert (
+        rows[2]["triggers"][0]["target_sla_days"] == load_triggers(MATRIX_PATH)[0].target_sla_days
+    )
     assert rows[0]["author"] == "Врач"
     assert rows[0]["created_at"] is not None
     assert rows[0]["triggers"][0]["version"] == 3
@@ -108,7 +110,7 @@ def test_загрузка_из_бд_и_отключение(monkeypatch, initial
     monkeypatch.setattr(matrix_store, "_read_database", read)
     monkeypatch.setattr("app.services.decision.engine.refresh_dictionary", lambda triggers: None)
     loaded = load_triggers()
-    assert len(loaded) == 9
+    assert len(loaded) == len(initial_items) - 1
     assert initial_items[0]["trigger_id"] not in {t.trigger_id for t in loaded}
 
 
@@ -131,7 +133,7 @@ def test_явный_путь_не_обращается_к_бд(monkeypatch):
         raise AssertionError("Обращение к БД не ожидалось")
 
     monkeypatch.setattr(matrix_store, "database_triggers", unexpected)
-    assert len(load_triggers(MATRIX_PATH)) == 10
+    assert len(load_triggers(MATRIX_PATH)) == 43
 
 
 def test_повреждённый_снимок_не_маскируется_файлом(monkeypatch):

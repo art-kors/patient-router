@@ -6,13 +6,15 @@
 например из-за отрицания».
 
 Тесты не зависят от БД и от реального декодера: находки конструируются
-вручную, триггеры — из config/routing_matrix.json.
+вручную, исторические клинические сценарии — из routing_matrix_legacy.json.
+Актуальная врачебная матрица проверяется отдельно в test_clinical_matrix.py.
 """
 
 import pytest
 
 from app.services.decision import DecisionEngine, load_triggers, validate
 from app.services.extraction.base import Finding
+from scripts.import_clinical_matrix import LEGACY_PATH
 
 
 # Хелпер: сделать находку с минимальными обязательными полями.
@@ -22,7 +24,7 @@ def finding(name: str, quote: str = "цитата", **kw) -> Finding:
 
 @pytest.fixture(scope="module")
 def engine() -> DecisionEngine:
-    return DecisionEngine(load_triggers())
+    return DecisionEngine(load_triggers(LEGACY_PATH))
 
 
 class TestMatrixLoading:

@@ -48,11 +48,15 @@ pytestmark = pytest.mark.anyio
 
 
 @pytest.fixture
-def analyze():
+def analyze(analytics_session):
     """Клиент к приложению; создаём заново на каждый тест."""
     from httpx import ASGITransport, AsyncClient
 
-    return AsyncClient(transport=ASGITransport(app=create_app()), base_url="http://test")
+    from app.db import get_session
+
+    app = create_app()
+    app.dependency_overrides[get_session] = lambda: analytics_session
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
 class TestAnalyzeTriggered:
@@ -198,6 +202,19 @@ class TestSafety:
 
 
 class TestEmergency:
+    @pytest.fixture(autouse=True)
+    def emergency_matrix(self, monkeypatch):
+        """Эскалацию проверяем на историческом правиле с emergency_flag=true."""
+        from app.api import analysis
+        from app.services.decision import DecisionEngine, load_triggers
+        from app.services.extraction import DictionaryExtractor
+        from scripts.import_clinical_matrix import LEGACY_PATH
+
+        monkeypatch.setattr(
+            analysis, "DecisionEngine", lambda: DecisionEngine(load_triggers(LEGACY_PATH))
+        )
+        monkeypatch.setattr(analysis, "get_extractor", lambda: DictionaryExtractor(LEGACY_PATH))
+
     """ЭКСТРЕННОЕ: маршрут не создаётся, персонал получает эскалацию.
 
     Тот же запрет, что в routing.create_from_match: emergency_flag=true
@@ -280,18 +297,20 @@ class TestDeterminism:
         async with analyze as c:
             first = (await c.post("/api/v1/analyze", json=payload)).json()
             second = (await c.post("/api/v1/analyze", json=payload)).json()
+        assert first.pop("analysis_id") != second.pop("analysis_id")
         assert first == second, "решение должно быть воспроизводимым"
 
 
 class TestNoSideEffects:
     async def test_анализ_ничего_не_меняет(self, analyze):
-        """Анализ — чистая функция: повторные вызовы не влияют друг на друга."""
+        """Журнал накапливается, но повторные вызовы не меняют клиническое решение."""
         async with analyze as c:
             first = (await c.post("/api/v1/analyze", json={"text": TRIGGERED})).json()
             # между вызовами — другой протокол; он не должен влиять на первый
             await c.post("/api/v1/analyze", json={"text": NORMAL})
             again = (await c.post("/api/v1/analyze", json={"text": TRIGGERED})).json()
-        assert first == again, "анализ не должен накапливать состояние"
+        assert first.pop("analysis_id") != again.pop("analysis_id")
+        assert first == again, "предыдущие разборы не должны менять решение"
 
 
 class TestOpenApiSchema:

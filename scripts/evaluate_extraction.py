@@ -1,61 +1,46 @@
 """Воспроизводимая оценка декодеров на синтетических демо-протоколах."""
 
+import argparse
 import re
 from collections import defaultdict
+from dataclasses import replace
 from pathlib import Path
 
 from app.services.decision import DecisionEngine
+from app.services.decision.matrix import load_triggers
 from app.services.extraction import DictionaryExtractor
 from app.services.quality import (
-    LabeledSample,
     QualityMetrics,
     StudyPredictions,
     compute_metrics,
     load_labeled_samples,
 )
 from doc_processing.adapter import TeammateExtractor
-from scripts.make_demo_data import GOLD, STUDY_GROUPS, build_labels, load_matrix, natural_key
-
-
-def demo_labels() -> list[LabeledSample]:
-    """Восстановить опубликованную разметку той же функцией, что генератор демо."""
-    fragments = {
-        "gynecology": "1 Ж ОМТ",
-        "abdomen": "1 ЖП",
-        "breast": "молочн железа",
-        "thyroid": "щитовидка",
-        "lower_limb": "ниж",
-    }
-    studies = []
-    source_of = {}
-    for prefix, fragment in fragments.items():
-        names = sorted((Path(name) for name in GOLD if name.startswith(fragment)), key=natural_key)
-        source_study = next(info[1] for info in STUDY_GROUPS.values() if info[0] == prefix)
-        for index, name in enumerate(names, 1):
-            study_id = f"demo_{prefix}_{index:02d}"
-            studies.append((study_id, source_study))
-            source_of[study_id] = name.name
-    return [LabeledSample(**item) for item in build_labels(studies, load_matrix(), source_of)]
+from scripts.generate_demo_labels import verify_protocol_coverage
+from scripts.import_clinical_matrix import OUTPUT_PATH
 
 
 def main() -> None:
     """Прогнать все протоколы; складывать матрицы строго по исследованиям."""
-    labels_path = Path("data/labeled")
-    if list(labels_path.glob("*.json")):
-        samples = load_labeled_samples(labels_path)
-        print("Разметка: data/labeled/*.json")
-    else:
-        samples = demo_labels()
-        print("Разметка восстановлена из GOLD генератора демо (исходный файл отсутствует)")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--matrix", type=Path, default=OUTPUT_PATH)
+    args = parser.parse_args()
+    samples = load_labeled_samples(Path("data/labeled"))
+    print("Разметка: data/labeled/labeled.json (файл репозитория)")
+    verify_protocol_coverage(samples, Path("data/demo/protocols"))
     grouped = defaultdict(list)
     for sample in samples:
         grouped[sample.study_id].append(sample)
     paths = sorted(Path("data/demo/protocols").glob("*.txt"))
     if not paths or set(grouped) - {path.stem for path in paths}:
         raise ValueError("Нет демо-протоколов для оценки всей разметки")
-    engine = DecisionEngine()
+    engine = DecisionEngine(load_triggers(args.matrix))
     print(f"Протоколов: {len(paths)}; размеченных пар: {len(samples)}")
-    for extractor in (DictionaryExtractor(), TeammateExtractor()):
+    teammate = TeammateExtractor()
+    teammate.dictionary = DictionaryExtractor(args.matrix)
+    teammate._negatives = teammate.dictionary._negatives
+    print("Оценка по исходным категориям; новые сценарии без разметки исключены")
+    for extractor in (DictionaryExtractor(args.matrix), teammate):
         counts = dict.fromkeys(("tp", "fp", "fn", "tn"), 0)
         for path in paths:
             text = path.read_text(encoding="utf-8")
@@ -67,8 +52,17 @@ def main() -> None:
                 study_type=study_type,
                 conclusion_text=extraction.conclusion_text,
             )
+            # Проекция только явных объединений на исходные категории разметки.
+            # Новые сценарии без разметки не считаем ни нормой, ни ошибкой.
+            projected = []
+            for match in decision.matches:
+                ids = match.trigger.legacy_trigger_ids or (match.trigger.trigger_id,)
+                for identifier in ids:
+                    projected.append(
+                        replace(match, trigger=replace(match.trigger, trigger_id=identifier))
+                    )
             metric = compute_metrics(
-                StudyPredictions(path.stem, tuple(decision.matches)), grouped[path.stem]
+                StudyPredictions(path.stem, tuple(projected)), grouped[path.stem]
             )
             for key in counts:
                 counts[key] += getattr(metric, key)

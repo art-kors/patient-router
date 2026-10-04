@@ -9,6 +9,12 @@ router = APIRouter(tags=["ui"])
 STATIC = Path(__file__).resolve().parents[1] / "static"
 
 
+@router.get("/analytics", include_in_schema=False)
+def analytics():
+    """Замкнутый цикл оценки качества и врачебной обратной связи."""
+    return FileResponse(STATIC / "analytics.html")
+
+
 @router.get("/patient", include_in_schema=False)
 def patient():
     """Кабинет пациента с сообщениями и планом действий."""
@@ -36,6 +42,7 @@ def index():
 STATIC_FILES = frozenset(
     {
         "dashboard.js",
+        "analytics.js",
         "style.css",
         "clinical.js",
         "clinical.css",
