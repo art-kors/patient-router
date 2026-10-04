@@ -17,7 +17,9 @@ def protocol(personal: bool = True) -> bytes:
         if personal
         else "Пол: женский"
     )
-    table.cell(0, 1).text = (
+    table.cell(
+        0, 1
+    ).text = (
         "Возраст на момент осмотра: 46 лет\nВрач: Петров Петр Петрович\nДата приёма: 05.10.2026"
     )
     document.add_paragraph("Размеры: 12 мм; BI-RADS: 3; ORADS: 2")

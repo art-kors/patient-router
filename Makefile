@@ -106,3 +106,19 @@ verify: ## Всё, что делает CI (для локального запу�
 	$(MAKE) lint
 	$(MAKE) test
 	@echo "✓ локальная проверка пройдена (миграции и Docker проверяются в CI)"
+
+# ── гейт перед пушем в main ───────────────────────────────────
+
+.PHONY: hooks
+hooks: ## Включить pre-push гейт (git config core.hooksPath .githooks)
+	git config core.hooksPath .githooks
+	@chmod +x .githooks/pre-push scripts/local_ci.sh
+	@echo "✓ гейт пуша включён: пуск в main пойдёт через scripts/local_ci.sh"
+
+.PHONY: gate
+gate: ## Прогнать гейт вручную (то же, что делает pre-push)
+	@scripts/local_ci.sh
+
+.PHONY: gate-fast
+gate-fast: ## Гейт без Docker: линт, типы, тесты
+	@scripts/local_ci.sh --fast
