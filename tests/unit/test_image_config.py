@@ -1,23 +1,16 @@
-"""Тесты того, что config/ попадает внутрь образа.
+"""Проверки упаковки локальных пакетов и матрицы маршрутизации.
 
-ЗАЧЕМ ЭТОТ ФАЙЛ
-================
-Регрессия, которую он ловит, была реальной: Dockerfile копировал app,
-alembic и alembic.ini, но забывал про config/. Приложение при этом
-стартовало, /health отвечал 200, а первая же попытка принять решение
-о маршруте падала с «матрица маршрутизации не найдена».
-
-Ловить это интеграционным тестом дорого: нужен docker и сборка образа.
-Такие тесты в CI не запускаются, и регрессия спокойно возвращается.
-Поэтому здесь статическая проверка Dockerfile — она дешёвая, работает
-везде и падает ровно на том дефекте, который нас интересует.
-
-Дополнительно проверяем, что путь в образе совпадает с тем, который
-ожидает settings: config_dir = "config", WORKDIR = /app → /app/config.
+Пакеты определяются по импортам исходников, включая отложенные импорты
+внутри функций и транзитивные зависимости. Проверяем оба слоя каждого
+образа: наличие пакета в репозитории ещё не гарантирует его доставку.
 """
 
+import ast
 import re
+import sys
 from pathlib import Path
+
+import pytest
 
 from app.settings import Settings
 
@@ -127,3 +120,94 @@ class TestDevImage:
         assert any(":ro" in m for m in mounts), (
             f"config смонтирован не read-only: {mounts}. Приложение не должно писать в матрицу."
         )
+
+
+def _local_packages(repo_root: Path = REPO_ROOT) -> list[str]:
+    """Найти замыкание локальных пакетов, импортируемых приложением.
+
+    Просматриваем все модули достигнутого пакета: так учитываются и пути,
+    вызываемые первым запросом, которые ещё не исполняются при старте.
+    Относительные импорты остаются внутри уже достигнутого пакета.
+    Импорты тестов не просматриваем. Стандартную библиотеку и каталоги
+    без Python-кода исключаем. Каталог alembic учитываем намеренно:
+    импортируется сторонняя библиотека, но ей нужны локальные миграции.
+    """
+    pending = {"app"}
+    found: set[str] = set()
+    while pending:
+        package = pending.pop()
+        found.add(package)
+        for source in (repo_root / package).rglob("*.py"):
+            tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+            for node in ast.walk(tree):
+                modules: list[str] = []
+                if isinstance(node, ast.Import):
+                    modules = [alias.name for alias in node.names]
+                elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                    modules = [node.module]
+                for module in modules:
+                    root = module.split(".", 1)[0]
+                    if (
+                        root not in sys.stdlib_module_names
+                        and root not in found
+                        and (repo_root / root).is_dir()
+                        and any((repo_root / root).rglob("*.py"))
+                    ):
+                        pending.add(root)
+    return sorted(found)
+
+
+def test_поиск_пакетов_не_зависит_от_внешних_и_тестовых_импортов(tmp_path: Path):
+    """Учитываем локальное замыкание, исключая stdlib, зависимости и тесты."""
+    sources = {
+        "app/main.py": "import json\nimport pytest\nimport assets\n"
+        "def load():\n    from local.adapter import run\n",
+        "local/adapter.py": "import nested\n",
+        "nested/__init__.py": "",
+        "json/__init__.py": "",
+        "unrelated/__init__.py": "",
+        "tests/test_random.py": "import unrelated\n",
+    }
+    for name, content in sources.items():
+        source = tmp_path / name
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text(content, encoding="utf-8")
+    (tmp_path / "assets").mkdir()
+    expected = ["app", "local", "nested"]
+    assert _local_packages(tmp_path) == expected
+    (tmp_path / "tests/test_random.py").write_text("import assets\n", encoding="utf-8")
+    assert _local_packages(tmp_path) == expected
+
+
+def _stages(dockerfile: str) -> dict[str, str]:
+    """Разделить инструкции по именованным слоям, не смешивая их COPY."""
+    stages: dict[str, str] = {}
+    current = None
+    for line in dockerfile.splitlines():
+        match = re.match(r"FROM\s+\S+\s+AS\s+(\w+)", line, re.IGNORECASE)
+        if match:
+            current = match.group(1).lower()
+            stages[current] = ""
+        elif current is not None:
+            stages[current] += line + "\n"
+    return stages
+
+
+@pytest.mark.parametrize("filename", ["Dockerfile", "Dockerfile.dev"])
+@pytest.mark.parametrize("package", _local_packages())
+def test_локальные_пакеты_попадают_в_оба_слоя(filename: str, package: str):
+    """Каждая локальная зависимость должна попасть в образ с правами appuser."""
+    stages = _stages((REPO_ROOT / filename).read_text(encoding="utf-8"))
+    assert "./" + package in _copies(stages["builder"], package), (
+        f"{filename}: сборочный слой не копирует пакет {package} в ./{package}"
+    )
+    target = f"/app/{package}"
+    runtime = stages["runtime"]
+    assert target in _copies(runtime, target, from_stage="builder"), (
+        f"{filename}: рантайм-слой не копирует пакет {package} в {target}"
+    )
+    assert any(
+        "--chown=appuser:appuser" in instruction
+        and target in _copies(instruction, target, from_stage="builder")
+        for instruction in _instructions(runtime)
+    ), f"{filename}: пакет {package} должен принадлежать appuser"

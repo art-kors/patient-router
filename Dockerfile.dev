@@ -27,6 +27,7 @@ WORKDIR /app
 # иначе uv не сможет собрать его (в отличие от --no-install-project).
 COPY pyproject.toml uv.lock ./
 COPY app ./app
+COPY doc_processing ./doc_processing
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 COPY config ./config
@@ -41,9 +42,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM builder AS runtime
 
 RUN useradd --create-home --uid 10001 appuser
+COPY --from=builder --chown=appuser:appuser /app/app /app/app
+COPY --from=builder --chown=appuser:appuser /app/doc_processing /app/doc_processing
+# Миграции и их конфигурация нужны для проверки схемы и ручного запуска в dev.
+COPY --from=builder --chown=appuser:appuser /app/alembic /app/alembic
+COPY --from=builder --chown=appuser:appuser /app/alembic.ini /app/alembic.ini
 COPY --from=builder --chown=appuser:appuser /app/scripts /app/scripts
 # Каталог индекса доступен непривилегированному пользователю.
 COPY --from=builder --chown=appuser:appuser /app/data/demo /app/data/demo
+
+USER appuser
 
 EXPOSE 8000
 
