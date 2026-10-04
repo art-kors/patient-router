@@ -243,7 +243,7 @@ async def test_пустой_каталог_демо_вызывает_ошибк�
 
     monkeypatch.setattr(seed_demo, "PROTOCOLS_DIR", tmp_path / "missing")
     session = AsyncMock()
-    with pytest.raises(RuntimeError, match="Ожидалось 89.*найдено 0"):
+    with pytest.raises(RuntimeError, match="Не найдены демо-протоколы"):
         await seed_demo.upsert_demo(session)
     session.commit.assert_not_awaited()
 

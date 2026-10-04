@@ -56,13 +56,13 @@ def parse_protocol(text: str) -> dict:
 
 
 async def upsert_demo(session: AsyncSession) -> dict[str, str]:
-    """Подготовить 89 протоколов без фиксации транзакции и вернуть маппинг demo_id → UUID."""
+    """Подготовить исходные протоколы без фиксации транзакции; вернуть demo_id → UUID."""
     index: dict[str, str] = {}
     created = updated = 0
 
     paths = sorted(PROTOCOLS_DIR.glob("*.txt"))
-    if len(paths) != 89:
-        raise RuntimeError(f"Ожидалось 89 демо-протоколов в {PROTOCOLS_DIR}, найдено {len(paths)}")
+    if not paths:
+        raise RuntimeError(f"Не найдены демо-протоколы в {PROTOCOLS_DIR}")
 
     for path in paths:
         text = path.read_text(encoding="utf-8")

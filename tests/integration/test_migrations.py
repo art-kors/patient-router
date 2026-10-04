@@ -8,13 +8,14 @@ from uuid import uuid4
 
 import pytest
 from fastapi import Response
-from sqlalchemy import inspect, text
+from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.api.health import ready
 from app.schema_check import migration_heads, schema_errors
 from app.settings import Settings
+from scripts.check_schema import check_schema
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -63,15 +64,13 @@ def upgrade(env):
     )
 
 
-async def test_upgrade_head_creates_22_tables(migration_database):
-    """Ревизия head обязана соответствовать двадцати двум реально созданным таблицам."""
+async def test_upgrade_head_matches_orm(migration_database):
+    """Ревизия head обязана создавать ровно те таблицы, которые объявлены в ORM."""
     engine, env = migration_database
     result = upgrade(env)
     assert result.returncode == 0, result.stdout + result.stderr
     async with engine.connect() as connection:
-        tables = await connection.run_sync(lambda sync: inspect(sync).get_table_names("public"))
-        domain_tables = set(tables) - {"alembic_version"}
-        assert len(domain_tables) == 22, f"Ожидалось 22 таблицы, найдено {len(domain_tables)}"
+        await connection.run_sync(check_schema)
         assert await connection.run_sync(schema_errors) == []
 
 
@@ -107,9 +106,7 @@ async def test_ready_rejects_broken_schema(migration_database, state):
         assert "Проверка схемы после миграций" in result.stderr
 
 
-async def test_seed_creates_89_protocols_and_is_idempotent(
-    migration_database, monkeypatch, tmp_path
-):
+async def test_seed_matches_sources_and_is_idempotent(migration_database, monkeypatch, tmp_path):
     """Сид работает с настоящими файлами и БД; повторный запуск не дублирует протоколы."""
     from scripts import seed_demo
 
@@ -119,11 +116,13 @@ async def test_seed_creates_89_protocols_and_is_idempotent(
     monkeypatch.setattr(seed_demo, "SessionFactory", async_sessionmaker(engine, autoflush=False))
     index_path = tmp_path / "demo" / "study_index.json"
     monkeypatch.setattr(seed_demo, "INDEX_PATH", index_path)
+    expected = len(list(seed_demo.PROTOCOLS_DIR.glob("*.txt")))
+    assert expected > 0
     for _ in range(2):
         assert await seed_demo.main() == 0
         async with engine.connect() as connection:
-            assert await connection.scalar(text("SELECT count(*) FROM protocol")) == 89
-            assert await connection.scalar(text("SELECT count(*) FROM study")) == 89
+            assert await connection.scalar(text("SELECT count(*) FROM protocol")) == expected
+            assert await connection.scalar(text("SELECT count(*) FROM study")) == expected
     assert index_path.exists()
 
 
