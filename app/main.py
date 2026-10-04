@@ -6,12 +6,16 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
+from app.api.admin import router as admin_router
 from app.api.analysis import router as analysis_router
 from app.api.demo import router as demo_router
 from app.api.health import router as health_router
+from app.api.mock_lk import router as mock_lk_router
+from app.api.mock_mis import router as mock_mis_router
 from app.api.mis import router as mis_router
 from app.api.quality import router as quality_router
 from app.api.routes import router as routes_router
+from app.api.ui import router as ui_router
 from app.settings import get_settings
 
 settings = get_settings()
@@ -91,6 +95,10 @@ def create_app() -> FastAPI:
     app.include_router(routes_router)
     app.include_router(mis_router)
     app.include_router(quality_router)
+    app.include_router(admin_router)
+    app.include_router(mock_mis_router)
+    app.include_router(mock_lk_router)
+    app.include_router(ui_router)
     return app
 
 
