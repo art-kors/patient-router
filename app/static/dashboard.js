@@ -110,4 +110,5 @@ $('editor').onsubmit = event => { event.preventDefault(); action(async () => {
 }); };
 $('disable').onclick = () => action(async () => { const result = await api(`/api/v1/admin/triggers/${encodeURIComponent(selected)}`, 'PUT', {enabled: false, author: $('editor').elements.author.value, description: $('editor').elements.description.value || 'Отключение триггера'}); await loadTriggers(); edit(items.find(i => i.trigger_id === selected)); status(`Триггер отключён. Версия ${result.version}.`); });
 $('reload').onclick = () => action(async () => { await api('/api/v1/admin/reload', 'POST'); status('Матрица применена.'); });
-action(refresh);
+if (location.hash === '#triggers') document.querySelector('[data-tab="triggers"]').click();
+else action(refresh);

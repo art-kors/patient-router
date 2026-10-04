@@ -63,15 +63,15 @@ def upgrade(env):
     )
 
 
-async def test_upgrade_head_creates_20_tables(migration_database):
-    """Ревизия head обязана соответствовать двадцати реально созданным таблицам."""
+async def test_upgrade_head_creates_22_tables(migration_database):
+    """Ревизия head обязана соответствовать двадцати двум реально созданным таблицам."""
     engine, env = migration_database
     result = upgrade(env)
     assert result.returncode == 0, result.stdout + result.stderr
     async with engine.connect() as connection:
         tables = await connection.run_sync(lambda sync: inspect(sync).get_table_names("public"))
         domain_tables = set(tables) - {"alembic_version"}
-        assert len(domain_tables) == 20, f"Ожидалось 20 таблиц, найдено {len(domain_tables)}"
+        assert len(domain_tables) == 22, f"Ожидалось 22 таблицы, найдено {len(domain_tables)}"
         assert await connection.run_sync(schema_errors) == []
 
 

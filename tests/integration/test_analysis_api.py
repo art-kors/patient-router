@@ -48,11 +48,15 @@ pytestmark = pytest.mark.anyio
 
 
 @pytest.fixture
-def analyze():
+def analyze(analytics_session):
     """Клиент к приложению; создаём заново на каждый тест."""
     from httpx import ASGITransport, AsyncClient
 
-    return AsyncClient(transport=ASGITransport(app=create_app()), base_url="http://test")
+    from app.db import get_session
+
+    app = create_app()
+    app.dependency_overrides[get_session] = lambda: analytics_session
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
 class TestAnalyzeTriggered:
@@ -280,18 +284,20 @@ class TestDeterminism:
         async with analyze as c:
             first = (await c.post("/api/v1/analyze", json=payload)).json()
             second = (await c.post("/api/v1/analyze", json=payload)).json()
+        assert first.pop("analysis_id") != second.pop("analysis_id")
         assert first == second, "решение должно быть воспроизводимым"
 
 
 class TestNoSideEffects:
     async def test_анализ_ничего_не_меняет(self, analyze):
-        """Анализ — чистая функция: повторные вызовы не влияют друг на друга."""
+        """Журнал накапливается, но повторные вызовы не меняют клиническое решение."""
         async with analyze as c:
             first = (await c.post("/api/v1/analyze", json={"text": TRIGGERED})).json()
             # между вызовами — другой протокол; он не должен влиять на первый
             await c.post("/api/v1/analyze", json={"text": NORMAL})
             again = (await c.post("/api/v1/analyze", json={"text": TRIGGERED})).json()
-        assert first == again, "анализ не должен накапливать состояние"
+        assert first.pop("analysis_id") != again.pop("analysis_id")
+        assert first == again, "предыдущие разборы не должны менять решение"
 
 
 class TestOpenApiSchema:

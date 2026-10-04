@@ -246,8 +246,8 @@ class TestMetadataIntegrity:
         for table in Base.metadata.sorted_tables:
             assert table.primary_key.columns, f"{table.name} без первичного ключа"
 
-    def test_количество_таблиц_20(self):
-        assert len(Base.metadata.tables) == 20
+    def test_количество_таблиц_22(self):
+        assert len(Base.metadata.tables) == 22
 
     def test_нет_таблиц_без_имени(self):
         assert all(t.name for t in Base.metadata.tables.values())
