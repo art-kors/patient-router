@@ -101,15 +101,9 @@ def split_list(value: str, separator: str = ",") -> list[str]:
 
 def formal_thresholds(value: str) -> dict:
     """Преобразовать только однозначную числовую границу без альтернатив и условий."""
-    match = re.fullmatch(
-        r"(?:размер|диаметр)\s*(?:>=|≥)\s*(\d+(?:[.,]\d+)?)\s*мм", value.strip(), re.I
-    )
-    if match:
-        return {"min_size_mm": float(match[1].replace(",", "."))}
-    match = re.fullmatch(r"стеноз\s*(?:>=|≥)\s*(\d+(?:[.,]\d+)?)\s*%", value.strip(), re.I)
-    if match:
-        return {"min_stenosis_percent": float(match[1].replace(",", "."))}
-    return {}
+    from app.services.decision.threshold_text import parse_threshold_text
+
+    return parse_threshold_text(value).thresholds
 
 
 def convert(csv_path: Path = CSV_PATH, legacy_path: Path = LEGACY_PATH) -> list[dict]:
