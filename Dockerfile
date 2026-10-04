@@ -22,9 +22,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
 # затем код приложения + миграции (пакет собирается как editable)
+# config/ — данные, а не код: без него в образе не будет routing_matrix.json,
+# и первая же попытка принять решение упадёт (см. app/settings.py).
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
+COPY config ./config
 COPY README.md ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
@@ -53,6 +56,9 @@ COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 COPY --from=builder --chown=appuser:appuser /app/app /app/app
 COPY --from=builder --chown=appuser:appuser /app/alembic /app/alembic
 COPY --from=builder --chown=appuser:appuser /app/alembic.ini /app/alembic.ini
+# settings.routing_matrix_path = "config/routing_matrix.json", WORKDIR=/app
+# → матрица обязана лежать по пути /app/config/routing_matrix.json
+COPY --from=builder --chown=appuser:appuser /app/config /app/config
 
 USER appuser
 

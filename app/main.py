@@ -33,12 +33,38 @@ log = structlog.get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Старт и корректное завершение приложения."""
+    """Старт и корректное завершение приложения.
+
+    Матрица маршрутизации проверяется ЗДЕСЬ, на старте, а не лениво на
+    первом запросе. Иначе стенд поднимается, /health отвечает 200, а
+    через минуту первый же пациент упирается в «матрица не найдена» —
+    и демо выглядит как поломка на защите. Матрица — это данные, которые
+    заказчик правит руками, поэтому ловим ошибку заранее и громко.
+
+    Не поднимаемся без матрицы: маршрутизировать пациентов по неполным
+    правилам опаснее, чем не подняться вовсе.
+    """
+    from app.services.decision.matrix import MatrixError, load_triggers, validate
+
+    try:
+        triggers = load_triggers()
+    except MatrixError as exc:
+        # Не поднимаемся: с понятным текстом, а не «матрица не найдена»
+        # через минуту после зелёного /health.
+        log.error("routing_matrix_unavailable", error=str(exc))
+        raise
+
+    for warning in validate(triggers):
+        # Предупреждения не мешают работе — но врач должен их видеть.
+        log.warning("routing_matrix_warning", detail=warning)
+
     log.info(
         "startup",
         app=settings.app_name,
         environment=settings.environment,
         db=settings.postgres_db,
+        routing_matrix=settings.routing_matrix_path,
+        triggers=len(triggers),
     )
     yield
     # закрываем пул соединений, иначе контейнер будет висеть на завершении
