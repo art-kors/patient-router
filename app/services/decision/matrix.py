@@ -21,6 +21,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from app.services.decision.threshold_text import parse_threshold_text
 from app.services.decision.thresholds import supports_threshold
 from app.settings import get_settings
 
@@ -58,6 +59,13 @@ class TriggerDef:
     required_attributes: tuple[str, ...] = ()
     threshold_text: str = ""
     legacy_trigger_ids: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        """Текстовый порог дополняет матрицу только при отсутствии явного числового."""
+        if not self.thresholds and self.threshold_text:
+            object.__setattr__(
+                self, "thresholds", parse_threshold_text(self.threshold_text).thresholds
+            )
 
     def matches(self, text: str) -> bool:
         """Есть ли в тексте хоть один синоним этой находки.
@@ -160,7 +168,8 @@ def validate(triggers: list[TriggerDef]) -> list[str]:
         if trigger.threshold_text and not trigger.thresholds:
             warnings.append(
                 f"{trigger.trigger_id}: врачебные условия сохранены текстом; "
-                "движок их не проверяет, требуется оценка специалиста"
+                f"{parse_threshold_text(trigger.threshold_text).reason}; "
+                "требуется оценка специалиста"
             )
         if not trigger.synonyms:
             warnings.append(f"{trigger.trigger_id}: нет синонимов — триггер не сработает")
