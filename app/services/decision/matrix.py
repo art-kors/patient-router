@@ -52,6 +52,13 @@ class TriggerDef:
     emergency_flag: bool = False
     version: int = 1
 
+    clinical_source: dict = field(default_factory=dict)
+    provenance: str = "project"
+    evidence_phrases: tuple[str, ...] = ()
+    required_attributes: tuple[str, ...] = ()
+    threshold_text: str = ""
+    legacy_trigger_ids: tuple[str, ...] = ()
+
     def matches(self, text: str) -> bool:
         """Есть ли в тексте хоть один синоним этой находки.
 
@@ -131,6 +138,12 @@ def _build(item: dict) -> TriggerDef:
         priority=int(item.get("priority", 3)),
         emergency_flag=bool(item.get("emergency_flag", False)),
         version=int(item.get("version", 1)),
+        clinical_source=dict(item.get("clinical_source") or {}),
+        provenance=item.get("provenance", "project"),
+        evidence_phrases=tuple(item.get("evidence_phrases") or ()),
+        required_attributes=tuple(item.get("required_attributes") or ()),
+        threshold_text=item.get("threshold_text", ""),
+        legacy_trigger_ids=tuple(item.get("legacy_trigger_ids") or ()),
     )
 
 
@@ -144,6 +157,11 @@ def validate(triggers: list[TriggerDef]) -> list[str]:
     warnings: list[str] = []
 
     for trigger in triggers:
+        if trigger.threshold_text and not trigger.thresholds:
+            warnings.append(
+                f"{trigger.trigger_id}: врачебные условия сохранены текстом; "
+                "движок их не проверяет, требуется оценка специалиста"
+            )
         if not trigger.synonyms:
             warnings.append(f"{trigger.trigger_id}: нет синонимов — триггер не сработает")
 

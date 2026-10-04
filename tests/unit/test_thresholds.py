@@ -35,6 +35,7 @@ from app.services.decision.thresholds import (
 )
 from app.services.extraction.base import Finding
 from app.settings import get_settings
+from scripts.import_clinical_matrix import LEGACY_PATH
 
 STUDY = "УЗДГ артерий нижних конечностей"
 STENOSIS = "Значимый стеноз артерий нижних конечностей"
@@ -49,7 +50,7 @@ PROTOCOL_07 = (
 
 
 def trigger_of(trigger_id: str) -> TriggerDef:
-    for trigger in load_triggers():
+    for trigger in load_triggers(LEGACY_PATH):
         if trigger.trigger_id == trigger_id:
             return trigger
     raise AssertionError(f"триггер {trigger_id} исчез из матрицы")

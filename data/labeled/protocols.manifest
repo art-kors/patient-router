@@ -1,0 +1,651 @@
+{
+  "demo_abdomen_01": {
+    "sha256": "875f496444a8a969fe6c486980302552902ad5bf1abcf05bd2279364bf2a6402",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_02": {
+    "sha256": "709fc2a69ae6aadd448d918c1f691675db40eadcb950ca4f720e8333ddc0f604",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_03": {
+    "sha256": "07204cf2b548a0e4cb48ab67607c369bb28c55767fb0db611dc837da22be4c28",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_04": {
+    "sha256": "164595bde3ae8bf1d4af45be86a33df6bf00429c3493a44ba0db19728e9eb420",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_05": {
+    "sha256": "b0ad522e08947a59bbb252088000101fcc2ded156d825708f1d939f4d9ad6d04",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_06": {
+    "sha256": "a635c9585ca9e6add62cb522ce25022ef585785e4c99399a49cfe4bf1057c6c5",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_07": {
+    "sha256": "107a7206a3265f24710b04136700953fd6f2735dd7c0cf973c3a832be8ae4497",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_08": {
+    "sha256": "0eb769b96a0a05201d68d02b6a7167f39bdc041505b99367c90733185f05b9ed",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_09": {
+    "sha256": "2f3042296f8de77d309ae75fee602dd58e98c62e56a0da991e638de1a923f0ee",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_10": {
+    "sha256": "7de330d46fbd5e426fd33e713c74a4f19ad5fe47322c08fd412f38435adc0ffe",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_11": {
+    "sha256": "4bdf37e69f0168f7c2a7192d7a0f264c2f7e585137f0e5238cf760c0aca05ac2",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_12": {
+    "sha256": "f5478f192307c7edaedc067365e847ebf6cebe06a1eb5a2486b7a12a660dd70f",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_13": {
+    "sha256": "43ccc48a01ca5deed3bed5c6de7cd161fdd27343bee682a2c28a3365bd44a8dd",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_14": {
+    "sha256": "b5da86fd8a1af93fc275c829f3568adc7bb15a50a1e4dc43de57ea8d4370dc47",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_15": {
+    "sha256": "43f92c213e68aa7c3b3cebc4645f2135cac9366bf41f6fc9bb2aaaf0c7f6df1a",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_16": {
+    "sha256": "7dc3af1619fa5a53b828fa82c1f1d47c2d89e34741c00f5fb533ae0f607a66ca",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_17": {
+    "sha256": "d51a0a8c090e138cc345587a809816c1f0254635c99ac0df8999653acb7104e9",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_18": {
+    "sha256": "5f16ed8b72815925358f1eca3f7365932957d6b4b9dc90b33e06fbe2b3219b96",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_19": {
+    "sha256": "6d8453903bd437ffae095b967cfddab9e2544207f1cfd7392de238ad2962e48b",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_20": {
+    "sha256": "6e10053849e404e239a29ee133e85e531cbf5bb966249137d393faad26f89f5a",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_21": {
+    "sha256": "860365c8f17385a935806343c8b027a54eadc5589270fed1a9bcacf6f2bab889",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_22": {
+    "sha256": "9b33c2480c8524868785306aaa0c6c13d299e8ccf050f3d1f36c52cab3721a0a",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_23": {
+    "sha256": "682bc138cda1db9d739c8e8dbf49ce4ed8475a498bfe5efecb2c7d84595b8da2",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_24": {
+    "sha256": "7f6c35263b6ee049ae845fdf9f963cd72708cba0c5d7ed9330c2082400585382",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_abdomen_25": {
+    "sha256": "a15db7db7bb66142d9c06f38ac69dfe03baa7fb2b6f66064c5890c10fa00c3fc",
+    "trigger_ids": [
+      "cholelithiasis",
+      "gallbladder_polyp",
+      "hydronephrosis"
+    ]
+  },
+  "demo_breast_01": {
+    "sha256": "708ddeb4ea43017f3b80fbed6602239246b218e959d2de5d6aaf5e23edac4313",
+    "trigger_ids": [
+      "breast_birads_3_5"
+    ]
+  },
+  "demo_breast_02": {
+    "sha256": "f736c65d4cb8265a66e973a46e70781506ffaab2508e56fca4c7030e367e0c57",
+    "trigger_ids": [
+      "breast_birads_3_5"
+    ]
+  },
+  "demo_breast_03": {
+    "sha256": "fed450728cd730749c99af5b53af630b610280ac9244b8e18ea95e990038a14b",
+    "trigger_ids": [
+      "breast_birads_3_5"
+    ]
+  },
+  "demo_breast_04": {
+    "sha256": "548ddb21b25539e3b7cac5e67972e8608933c725464596a0b9e284b07e57b741",
+    "trigger_ids": [
+      "breast_birads_3_5"
+    ]
+  },
+  "demo_breast_05": {
+    "sha256": "e48ac5ce3a1daded6c642d96ec13a03b7362ab987646302d206f80dbfd129261",
+    "trigger_ids": [
+      "breast_birads_3_5"
+    ]
+  },
+  "demo_breast_06": {
+    "sha256": "b128aca9cfbdeed846ec2bd1797d94f5843741ea1fe0056f7cc0fdadd76c3b69",
+    "trigger_ids": [
+      "breast_birads_3_5"
+    ]
+  },
+  "demo_breast_07": {
+    "sha256": "660486285b5f603b2245503150413961ed394777eb5bd0a76ed8de34466fe79f",
+    "trigger_ids": [
+      "breast_birads_3_5"
+    ]
+  },
+  "demo_breast_08": {
+    "sha256": "dd5f09049d7f533d834e7c51525f6d979a35c611639ecf80a7d5421c9de1b7fc",
+    "trigger_ids": [
+      "breast_birads_3_5"
+    ]
+  },
+  "demo_breast_09": {
+    "sha256": "8967ce5ba32aa4ad3b9a3f4a71db8f9e1e09162730b36ce2b555561607c9645a",
+    "trigger_ids": [
+      "breast_birads_3_5"
+    ]
+  },
+  "demo_breast_10": {
+    "sha256": "ec0c84b2b851385b49c185fbaf62865237677770bad90795d586e574fc3ba169",
+    "trigger_ids": [
+      "breast_birads_3_5"
+    ]
+  },
+  "demo_gynecology_01": {
+    "sha256": "32654ae20d9de53a2eed3d204d5b86fbbdf23b7e48c3879bea25c1ad8459f732",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_02": {
+    "sha256": "712ca79e7402efa32d9a7a95df6585581e123836806dd759f65e28b561a355a0",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_03": {
+    "sha256": "6cd605a0d1d111cb73a5f481ee7cd14703abdd7911462168c8362d175288e461",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_04": {
+    "sha256": "5cf63264df642eb4255ce1e21b08dd1e6ceb5b3f58e59dca1141b1358d5c4785",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_05": {
+    "sha256": "a9b43c26ac640387758b120b56f6d8f6aa490e14b58acff9ff0e5c2056999687",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_06": {
+    "sha256": "1bf8d0c9f34c34459daad209f8e68f21eb70a2fe65ff95aed11d9267a821b800",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_07": {
+    "sha256": "da550d3bf25b9c15f28b3a3e3faa74688c60f1d1eed8817226b35520e521a6af",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_08": {
+    "sha256": "58a6bdc50d9d956b497e448808f170ec698db2df846c26894b410f9b12a0f691",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_09": {
+    "sha256": "f13db3f76c00ca7cf2716585b3ffbaaa7ce95983632d2069af5471564e5a64ba",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_10": {
+    "sha256": "4c358d6347229d90b075c50eb82ef2f84ade01d69584ae13032a45eb7de10d6d",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_11": {
+    "sha256": "fef764ec81b25bbf9ecb5de338785bdf3e49dca15f8fe79edf34143a54f92a49",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_12": {
+    "sha256": "dcc11dfa3a925b435b489713c68e19d4ec7663c7686fde1240426dbfc33ae3d5",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_13": {
+    "sha256": "e76c7979fe846675286fe9c6390f6f5616e3fbbc559ac40856bdca413c47e72c",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_14": {
+    "sha256": "d9919551bc4af7297a887d74a664598ea3280e2cccb352b6f5100a6f3759a6e8",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_15": {
+    "sha256": "7a74de5c4715ce29e87bfde566a6a9251031b7de62c57a5855b463c316eb730e",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_16": {
+    "sha256": "63aba00f99aeefca3311ad1ff0f8ea41bfa92779d9741cc078c9976d65655155",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_17": {
+    "sha256": "aacf26bdce5d82681335d6af5af1b0f326fe2e4de6d010271d947785a4cb0356",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_18": {
+    "sha256": "bc2f6fe5be999f0e579e533603dff4e8fb2e6227d5609da19daf20f45a111c17",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_19": {
+    "sha256": "62698a743d1b32cf9fe53320247406abc3e43af3a8950988f37c7e8df2f6baa9",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_20": {
+    "sha256": "046705dac75512c4988733732584d31f455b5f25cf3108895be7a17beeb79e36",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_21": {
+    "sha256": "c25e17953ed245490bcd9ae1a5871c88120956e95dfc9a6af030981df7d97f1d",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_22": {
+    "sha256": "9b7b3c99d14a660f5ebb908759d31f92f15de1714f6d6f4f3726092e4134c4e4",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_23": {
+    "sha256": "0a4d9d06b5637f8917fc4fe7f51bd4dff8c62c59247befa4ba094b76d825791b",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_24": {
+    "sha256": "65ecc156a5de80a56212f727d4315f63827286907d0510ea0da880e2e9582892",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_gynecology_25": {
+    "sha256": "5d795489526efb5d6142677abeb62220c98d10bd759f35eb40fd95237f889793",
+    "trigger_ids": [
+      "endometrial_polyp",
+      "fibroid_uterus",
+      "ovarian_cyst",
+      "submucosal_fibroid"
+    ]
+  },
+  "demo_lower_limb_01": {
+    "sha256": "632b3eecaf00ad0660368ec58dc4c860ab5066ac3bfe81701ecfe02af18e7495",
+    "trigger_ids": [
+      "lower_limb_stenosis"
+    ]
+  },
+  "demo_lower_limb_02": {
+    "sha256": "4d2d9e06243dde445ba754311c3cc63f811457759534b71134d9dac601578ab0",
+    "trigger_ids": [
+      "lower_limb_stenosis"
+    ]
+  },
+  "demo_lower_limb_03": {
+    "sha256": "f1ccc363aa79dea765dea363c1786b2ef9743214176afa35449d726a995358ea",
+    "trigger_ids": [
+      "lower_limb_stenosis"
+    ]
+  },
+  "demo_lower_limb_04": {
+    "sha256": "b80080708b7724d97e74370aad7fc0ef5a540b9abe812ce6b873e4157156db9d",
+    "trigger_ids": [
+      "lower_limb_stenosis"
+    ]
+  },
+  "demo_lower_limb_05": {
+    "sha256": "91638f4b818a4408fd00174c3911d7c02f8f2989129b2503cf6e4cbac461d809",
+    "trigger_ids": [
+      "lower_limb_stenosis"
+    ]
+  },
+  "demo_lower_limb_06": {
+    "sha256": "3af55275afc1b949d5cd76a4c662801a8d69096402c0c6222b2162835f4882e8",
+    "trigger_ids": [
+      "lower_limb_stenosis"
+    ]
+  },
+  "demo_lower_limb_07": {
+    "sha256": "98f666a5ea8c1fa7ab30d86b7a6d1c99757839e6f9d304876b270a6a25174590",
+    "trigger_ids": [
+      "lower_limb_stenosis"
+    ]
+  },
+  "demo_lower_limb_08": {
+    "sha256": "cc915dd9161489cddce7fb6c29081fd553703ce3df626b707c65b135a4e789cf",
+    "trigger_ids": [
+      "lower_limb_stenosis"
+    ]
+  },
+  "demo_lower_limb_09": {
+    "sha256": "4979232418b08cf15f380ce95e89da235f10715ba58a869a07247c8fc0e1735a",
+    "trigger_ids": [
+      "lower_limb_stenosis"
+    ]
+  },
+  "demo_prostate_01": {
+    "sha256": "475b6b20f7fa622e1450011c0939007321ed45b21257e896899b22c72a5adfd9",
+    "trigger_ids": [],
+    "excluded_reason": "Нет категории в исходной матрице"
+  },
+  "demo_prostate_02": {
+    "sha256": "09f7fe7d8aa080952db0f493f200496f6c92c1caf984cca5f8d76bc6012c4ced",
+    "trigger_ids": [],
+    "excluded_reason": "Нет категории в исходной матрице"
+  },
+  "demo_prostate_03": {
+    "sha256": "e992490d022eec32668fccf8cb6b3e99f37dc76f7c95b22cd053de4e7ff57c4d",
+    "trigger_ids": [],
+    "excluded_reason": "Нет категории в исходной матрице"
+  },
+  "demo_prostate_04": {
+    "sha256": "a402ae4cf53c22fa3719bfd48e58556011891f0fc53325d15775e0369b579a6f",
+    "trigger_ids": [],
+    "excluded_reason": "Нет категории в исходной матрице"
+  },
+  "demo_prostate_05": {
+    "sha256": "b42c391a965975c943c2190f972f2824423dd039602fa34810b0f6265b256526",
+    "trigger_ids": [],
+    "excluded_reason": "Нет категории в исходной матрице"
+  },
+  "demo_prostate_06": {
+    "sha256": "b50a510670435e5697a288e219be1355c1f92db845144d9746052b260d687b33",
+    "trigger_ids": [],
+    "excluded_reason": "Нет категории в исходной матрице"
+  },
+  "demo_prostate_07": {
+    "sha256": "32937f4c8de1029efe178c66af2d10b28c9cb35481755c72b8315d9e0c9df4e7",
+    "trigger_ids": [],
+    "excluded_reason": "Нет категории в исходной матрице"
+  },
+  "demo_prostate_08": {
+    "sha256": "2e0b5ce5e9f5c1058537e260e9f1a846a995dc1a2b3f12e2792391957288c892",
+    "trigger_ids": [],
+    "excluded_reason": "Нет категории в исходной матрице"
+  },
+  "demo_prostate_09": {
+    "sha256": "4b99b20fdb74010ad4570eee31b383d3667411c6d3c1d907afc045efbb6fa26f",
+    "trigger_ids": [],
+    "excluded_reason": "Нет категории в исходной матрице"
+  },
+  "demo_prostate_10": {
+    "sha256": "f57f1a05ab483d65b9d6eb15f94709e35ac7f8d025ae78eb8fadc1f51283f0c8",
+    "trigger_ids": [],
+    "excluded_reason": "Нет категории в исходной матрице"
+  },
+  "demo_thyroid_01": {
+    "sha256": "00a9e54e3dd4f291ee89d9848b5680dc63e6aaca0a52c06c6b649d0bc06fe74d",
+    "trigger_ids": [
+      "thyroid_nodule"
+    ]
+  },
+  "demo_thyroid_02": {
+    "sha256": "19f4a81055a085c65bc61ec4e64eda6665f0359ae8464b50430b41ab9f1d1c60",
+    "trigger_ids": [
+      "thyroid_nodule"
+    ]
+  },
+  "demo_thyroid_03": {
+    "sha256": "089093a4fac3d793d694a278c524e32e98f08743ea6eb45d4e744846ffbd2a89",
+    "trigger_ids": [
+      "thyroid_nodule"
+    ]
+  },
+  "demo_thyroid_04": {
+    "sha256": "e9210d0cecf61c0ffb441c4a37a8a1861ab2443322cf3f536130ad32e126088b",
+    "trigger_ids": [
+      "thyroid_nodule"
+    ]
+  },
+  "demo_thyroid_05": {
+    "sha256": "f7c476af832c75a357d99471dae9db36ac3d841ebf7c1b69082b98a5197d9815",
+    "trigger_ids": [
+      "thyroid_nodule"
+    ]
+  },
+  "demo_thyroid_06": {
+    "sha256": "02af594a7a46e086f2ca5fbbff2f03cc71053815038d7f021dbcc61e1ef36f5f",
+    "trigger_ids": [
+      "thyroid_nodule"
+    ]
+  },
+  "demo_thyroid_07": {
+    "sha256": "40c839e9dcde79d7d19acdac151b9fff661adeeb9f8f7ddec924494274bc1052",
+    "trigger_ids": [
+      "thyroid_nodule"
+    ]
+  },
+  "demo_thyroid_08": {
+    "sha256": "fae4d1941737b64a371282a5d96d54d10cfbe338039d36464b5e9dd1add8eaef",
+    "trigger_ids": [
+      "thyroid_nodule"
+    ]
+  },
+  "demo_thyroid_09": {
+    "sha256": "60df6c4ce6844a45c3e5cdc7e1027ccca872fa6fa8bd9855a4cdbb5e439d764a",
+    "trigger_ids": [
+      "thyroid_nodule"
+    ]
+  },
+  "demo_thyroid_10": {
+    "sha256": "640e4ce80d1a54be4417183d344f5515d0c39880b5f678bf70e5be915a90fb8b",
+    "trigger_ids": [
+      "thyroid_nodule"
+    ]
+  }
+}
