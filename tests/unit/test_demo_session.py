@@ -15,7 +15,7 @@
 
 import asyncio
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -72,11 +72,16 @@ class FakeSession:
         self.connects = 0
         self.rollbacks = 0
         self.flushes = 0
+        self.commits = 0
         self.statements = []
 
     async def connect(self):
         """Ручка не должна открывать отдельное пробное соединение."""
         self.connects += 1
+
+    async def commit(self):
+        """Отметки таймеров обязаны уйти в БД, а не остаться в откате."""
+        self.commits += 1
 
     async def rollback(self):
         self.rollbacks += 1
@@ -304,3 +309,62 @@ async def test_сброс_демо_гасит_таймеры_при_живой_�
     assert (await client.post(PREFIX + "/clock/reset")).status_code == 200
 
     assert any("UPDATE timer" in command for command in session.commands())
+
+
+# ── Регрессия: отметки таймеров уходили с откатом ───────────────────────────
+# Чёрный аудит на живой PostgreSQL: `/clock/advance` помечал таймеры
+# ``fired=true``, но в `app/api/demo.py` не было ни одного ``commit()`` —
+# сессия закрывалась с откатом, в БД всё оставалось ``fired=false``, и вторая
+# прокрутка стреляла теми же таймерами снова. Пациент получал одни и те же
+# напоминания бесконечно.
+
+
+@pytest.mark.parametrize("path,payload", [("/clock/advance", {"days": 30}), ("/clock/set", None)])
+async def test_прокрутка_времени_коммитит_таймеры(client, use_session, clock, path, payload):
+    """Отметки сработавших таймеров должны пережить закрытие сессии."""
+    body = {"to": (clock.now() + timedelta(days=30)).isoformat()}
+    session = use_session(FakeSession())
+
+    response = await client.post(PREFIX + path, json=payload if payload is not None else body)
+
+    assert response.status_code == 200
+    assert session.commits == 1, "без коммита UPDATE timer уйдёт с откатом сессии"
+
+
+async def test_сброс_демо_коммитит_гашение(client, use_session, clock):
+    """Гашение несработавших таймеров при сбросе — тоже запись в БД."""
+    clock.advance(72)
+    session = use_session(FakeSession())
+
+    assert (await client.post(PREFIX + "/clock/reset")).status_code == 200
+
+    assert session.commits == 1
+
+
+@pytest.mark.parametrize("error", [db_is_down(), db_socket_is_gone()], ids=["driver", "socket"])
+async def test_при_мёртвой_базе_коммитить_нечего(client, use_session, clock, error):
+    """Нет базы — коммитить нечего: ручка честно пишет database=unavailable."""
+    session = use_session(FakeSession(error=error))
+
+    response = await client.post(PREFIX + "/clock/advance", json={"hours": 1})
+
+    assert response.status_code == 200
+    assert response.json()["database"] == "unavailable"
+    assert session.commits == 0
+
+
+async def test_коммит_падает_с_базой_между_проверкой_и_записью(
+    client, use_session, clock, monkeypatch
+):
+    """База легла после проверки: откатываем и не врём про сохранение."""
+    session = use_session(FakeSession())
+
+    async def broken_commit():
+        raise db_is_down()
+
+    session.commit = broken_commit
+    assert (await client.post(PREFIX + "/clock/advance", json={"hours": 1})).status_code == 200
+    body = (await client.post(PREFIX + "/clock/advance", json={"hours": 1})).json()
+
+    assert body["database"] == "unavailable"
+    assert session.rollbacks >= 1

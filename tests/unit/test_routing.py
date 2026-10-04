@@ -159,3 +159,82 @@ async def test_emergency_match_cannot_create_route():
 def test_allowed_transitions_returns_copy():
     allowed_transitions("created").clear()
     assert "notified" in allowed_transitions("created")
+
+
+# ── Регрессия: маршрут закрывался без тактики врача ─────────────────────────
+# Чёрный аудит: из decision_pending POST /routes/{id}/transition в
+# closed_no_operation отвечал 200, и close_reason заполнялся при нуле тактик
+# в аудите. Требование кейса и README: без выбранной тактики маршрут не
+# закрывается. Проверка живёт в сервисе, а не в ручке, — иначе путь через
+# событие МИС обошёл бы её.
+
+
+def session_with_tactics(route, recorded, step_no=0):
+    """Сессия, у которой в аудите маршрута записана (или нет) тактика.
+
+    Проверка тактики идёт через ``session.scalar`` (счётчик записей аудита),
+    чтение маршрута и нумерация шагов — через ``session.execute``.
+    """
+    session = session_for(route, step_no)
+    session.scalar = AsyncMock(return_value=recorded)
+    return session
+
+
+@pytest.mark.parametrize(
+    "target", ["closed_no_operation", "closed_by_patient"], ids=["нет_операции", "отказ"]
+)
+async def test_закрытие_из_decision_pending_без_тактики_запрещено(target):
+    route = Route(id=uuid4(), status="decision_pending")
+    session = session_with_tactics(route, recorded=0)
+
+    with pytest.raises(TacticsRequiredError):
+        await RoutingService().transition(session, route.id, target, "врач", "Основание")
+
+    assert route.status == "decision_pending"
+    assert route.closed_at is None and route.close_reason is None
+    session.add.assert_not_called()
+
+
+async def test_закрытие_с_тактикой_в_этом_же_переходе_разрешено():
+    """apply_tactics ведёт тактику в том же переходе — запрета быть не должно."""
+    route = Route(id=uuid4(), status="decision_pending")
+    session = session_with_tactics(route, recorded=0)
+
+    result = await RoutingService().apply_tactics(
+        session, route.id, Tactics.NO_SURGERY, "Операция не показана", "врач"
+    )
+
+    assert result.status == "closed_no_operation"
+    assert result.close_reason == CloseReason.NO_OPERATION
+
+
+async def test_закрытие_после_записанной_тактики_разрешено():
+    """Тактика могла быть записана раньше — тогда закрытие законно."""
+    route = Route(id=uuid4(), status="decision_pending")
+    session = session_with_tactics(route, recorded=1)
+
+    result = await RoutingService().transition(
+        session, route.id, "closed_by_patient", "врач", "Пациент отказался"
+    )
+
+    assert result.status == "closed_by_patient"
+
+
+@pytest.mark.parametrize(
+    "status,target",
+    [
+        ("followup_scheduled", "followup_done"),
+        ("awaiting_booking", "closed_by_patient"),
+        ("awaiting_booking", "route_not_realized"),
+        ("booked", "cancelled"),
+        ("created", "cancelled"),
+    ],
+)
+async def test_контроль_и_отмена_тактики_не_требуют(status, target):
+    """Сценарий «контроль без тактики» и системные закрытия должны работать."""
+    route = Route(id=uuid4(), status=status)
+    session = session_with_tactics(route, recorded=0)
+
+    result = await RoutingService().transition(session, route.id, target, "система", "Основание")
+
+    assert str(result.status) == target

@@ -31,7 +31,7 @@ from app.services.decision.engine import DecisionEngine
 from app.services.decision.matrix import TriggerDef
 from app.services.extraction.base import ExtractionResult
 from app.services.extraction.base import Finding as ExtractedFinding
-from app.services.mis import EVENT_TYPES, MisEventHandler
+from app.services.mis import EVENT_TYPES, MisEventConflictError, MisEventHandler, _datetime
 from app.services.routing import RoutingService, RoutingTransitionError
 from app.services.timers import TimerEngine
 
@@ -129,6 +129,16 @@ def event(name, route=None, **payload):
     }
 
 
+def stored_delivery(delivery):
+    """Запись в журнале, соответствующая доставке, — честный повтор."""
+    return MisEvent(
+        event_id=delivery["event_id"],
+        event_type=delivery["event_type"],
+        occurred_at=_datetime(delivery.get("occurred_at")),
+        payload=dict(delivery.get("payload") or {}),
+    )
+
+
 async def test_все_12_типов_в_справочнике(client):
     response = await client.get("/api/v1/mis/event-types")
     assert response.status_code == 200
@@ -141,7 +151,7 @@ async def test_все_12_типов_в_справочнике(client):
 async def test_дубль_не_создаёт_дубль(session):
     handler = MisEventHandler()
     delivery = event("AppointmentBooked")
-    session.scalar.return_value = MisEvent(event_id=delivery["event_id"])
+    session.scalar.return_value = stored_delivery(delivery)
     handler.handlers["AppointmentBooked"] = AsyncMock()
     assert await handler.handle(session, delivery) == {
         "duplicate": True,
@@ -156,13 +166,98 @@ async def test_дубль_не_создаёт_дубль(session):
 async def test_конкурентный_дубль_не_обрабатывается(session):
     handler = MisEventHandler()
     delivery = event("AppointmentBooked")
-    session.scalar.side_effect = [None, MisEvent(event_id=delivery["event_id"])]
+    session.scalar.side_effect = [None, stored_delivery(delivery)]
     session.flush.side_effect = IntegrityError("insert", {}, Exception("duplicate"))
     handler.handlers["AppointmentBooked"] = AsyncMock()
     result = await handler.handle(session, delivery)
     assert result["duplicate"] is True
     handler.handlers["AppointmentBooked"].assert_not_awaited()
     session.execute.assert_not_awaited()
+
+
+# ── Регрессия: тот же event_id с другим payload ─────────────────────────────
+# `docs/api.md` обещает 409 EVENT_ID_CONFLICT, но повторная доставка под
+# занятым event_id молча отбрасывалась как дубль. Исправленный протокол под
+# старым event_id терялся, и в базе оставался прежний, уже неверный факт.
+
+
+def delivered(name, **payload):
+    """Запись в журнале: хранит то, что пришло, — с теми же полями доставки."""
+    delivery = event(name, **payload)
+    return delivery, stored_delivery(delivery)
+
+
+async def test_тот_же_event_id_с_другим_payload_конфликт(session):
+    """Изменённый протокол под старым event_id — конфликт, а не дубль."""
+    handler = MisEventHandler()
+    handler.handlers["StudyProtocolCorrected"] = AsyncMock()
+    stored, _ = delivered("StudyProtocolCorrected", raw_text="исходный протокол")
+    delivery = {
+        **stored,
+        "payload": {"raw_text": "исправленный протокол"},
+    }
+    delivery["event_id"] = stored["event_id"]
+    session.scalar.return_value = stored_delivery(stored)
+
+    with pytest.raises(MisEventConflictError):
+        await handler.handle(session, delivery)
+
+    handler.handlers["StudyProtocolCorrected"].assert_not_awaited()
+    session.add.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("payload", {"raw_text": "исправленный протокол"}),
+        ("event_type", "StudyProtocolSigned"),
+        ("occurred_at", "2026-10-05T09:00:00Z"),
+    ],
+)
+async def test_любое_расхождение_конфликт(session, field, value):
+    """Конфликт — это любое отличие факта, а не только смена payload."""
+    handler = MisEventHandler()
+    handler.handlers["StudyProtocolCorrected"] = AsyncMock()
+    stored, _ = delivered("StudyProtocolCorrected", raw_text="исходный")
+    stored["occurred_at"] = "2026-10-04T09:00:00Z"
+    row = stored_delivery(stored)
+    row.event_id = stored["event_id"]
+    delivery = dict(stored)
+    delivery[field] = _datetime(value) if field == "occurred_at" else value
+    session.scalar.return_value = row
+
+    with pytest.raises(MisEventConflictError):
+        await handler.handle(session, delivery)
+
+    handler.handlers["StudyProtocolCorrected"].assert_not_awaited()
+
+
+async def test_конкурентная_доставка_с_другим_payload_конфликт(session):
+    """То же при гонке: конфликт должен уйти, а не раствориться в дубле."""
+    handler = MisEventHandler()
+    handler.handlers["StudyProtocolCorrected"] = AsyncMock()
+    ours, _ = delivered("StudyProtocolCorrected", raw_text="исходный")
+    theirs, _ = delivered("StudyProtocolCorrected", raw_text="исправленный")
+    theirs["event_id"] = ours["event_id"]
+    session.scalar.side_effect = [None, stored_delivery(theirs)]
+    session.flush.side_effect = IntegrityError("insert", {}, Exception("duplicate"))
+
+    with pytest.raises(MisEventConflictError):
+        await handler.handle(session, ours)
+
+    handler.handlers["StudyProtocolCorrected"].assert_not_awaited()
+
+
+async def test_повтор_с_тем_же_содержимым_остаётся_дублем(session):
+    """Точный повтор — дубль и 200, а не конфликт: ретрай МИС не должен падать."""
+    handler = MisEventHandler()
+    handler.handlers["StudyProtocolCorrected"] = AsyncMock()
+    ours, row = delivered("StudyProtocolCorrected", raw_text="исходный")
+    session.scalar.return_value = row
+
+    assert (await handler.handle(session, ours))["duplicate"] is True
+
+    handler.handlers["StudyProtocolCorrected"].assert_not_awaited()
 
 
 def setup_analysis(session, monkeypatch, *, emergency=False, fired=True):
@@ -335,10 +430,66 @@ async def test_api_повтор_возвращает_200(client, session):
     try:
         response = await client.post("/api/v1/mis/events", json=delivery)
         assert response.status_code == 202
-        session.scalar.return_value = MisEvent(event_id=delivery["event_id"])
+        session.scalar.return_value = stored_delivery(delivery)
         response = await client.post("/api/v1/mis/events", json=delivery)
         assert response.status_code == 200
         assert response.json()["duplicate"] is True
+    finally:
+        app.dependency_overrides.pop(get_session)
+
+
+async def test_api_конфликт_по_event_id_даёт_409(client, session):
+    """Обещанный в docs/api.md отказ: занятый event_id с другим содержимым."""
+    from app.db import get_session
+    from app.main import app
+
+    async def dependency():
+        yield session
+
+    session.commit = AsyncMock()
+    delivery = event("StudyProtocolCorrected", raw_text="исходный протокол")
+    delivery.update(occurred_at="2026-10-04T09:00:00Z")
+    app.dependency_overrides[get_session] = dependency
+    try:
+        response = await client.post("/api/v1/mis/events", json=delivery)
+        assert response.status_code == 202
+        stored = stored_delivery(event("StudyProtocolCorrected", raw_text="исходный протокол"))
+        stored.event_id = delivery["event_id"]
+        session.scalar.return_value = stored
+        response = await client.post(
+            "/api/v1/mis/events",
+            json={**delivery, "payload": {"raw_text": "исправленный протокол"}},
+        )
+        assert response.status_code == 409
+        detail = response.json()["detail"]
+        assert detail["code"] == "EVENT_ID_CONFLICT"
+        assert delivery["event_id"] in detail["message"]
+    finally:
+        app.dependency_overrides.pop(get_session)
+
+
+async def test_api_конфликт_не_перезаписывает_исходный_факт(client, session):
+    """409 не должен ни обработать событие, ни записать что-либо в базу."""
+    from app.db import get_session
+    from app.main import app
+
+    async def dependency():
+        yield session
+
+    session.commit = AsyncMock()
+    delivery = event("Unknown")
+    delivery.update(occurred_at="2026-10-04T09:00:00Z")
+    app.dependency_overrides[get_session] = dependency
+    try:
+        stored = stored_delivery(delivery)
+        stored.event_id = delivery["event_id"]
+        session.scalar.return_value = stored
+        session.add.reset_mock()
+        response = await client.post(
+            "/api/v1/mis/events", json={**delivery, "payload": {"text": "иное"}}
+        )
+        assert response.status_code == 409
+        session.add.assert_not_called()
     finally:
         app.dependency_overrides.pop(get_session)
 

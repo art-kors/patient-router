@@ -68,16 +68,44 @@ def _date(value):
     return date.fromisoformat(value) if isinstance(value, str) else value
 
 
+class MisEventConflictError(ValueError):
+    """Тот же event_id пришёл с другим содержимым.
+
+    Отдельный класс от RoutingTransitionError: это не клиническое ограничение,
+    а противоречие в самом факте доставки. Повтор с тем же payload — дубль,
+    повтор с другим — попытка переписать уже записанный факт.
+    """
+
+
 class MisEventHandler:
     def __init__(self):
         self.routing = RoutingService()
         self.timers = TimerEngine()
         self.handlers = {name: getattr(self, f"_handle_{name}") for name in EVENT_TYPES}
 
+    def _same_delivery(self, stored: MisEvent, event: dict) -> bool:
+        """Отличить честный повтор доставки от попытки переписать факт.
+
+        Дубль — это тот же самый факт: тот же тип, то же время, тот же payload и
+        та же ссылка на пациента/исследование. Любое расхождение — конфликт:
+        event_id уже занят, и молча выбросить исправленный протокол значило бы
+        потерять его, оставив в базе прежнюю, уже неверную запись.
+        """
+        return (
+            stored.event_type == event.get("event_type")
+            and (stored.payload or {}) == (event.get("payload") or {})
+            and _datetime(stored.occurred_at) == _datetime(event.get("occurred_at"))
+            and stored.patient_id == _uuid((event.get("subject") or {}).get("patient_id"))
+            and stored.study_id == _uuid((event.get("subject") or {}).get("study_id"))
+        )
+
     async def handle(self, session, event: dict) -> dict:
         """Обработать событие; вызывающий код фиксирует или откатывает транзакцию целиком."""
         event_id = event["event_id"]
-        if await session.scalar(select(MisEvent).where(MisEvent.event_id == event_id)):
+        stored = await session.scalar(select(MisEvent).where(MisEvent.event_id == event_id))
+        if stored is not None:
+            if not self._same_delivery(stored, event):
+                raise MisEventConflictError(event_id)
             return {"duplicate": True, "event_id": event_id}
         subject = event.get("subject", {})
         occurred = _datetime(event.get("occurred_at")) or get_clock().now()
@@ -96,9 +124,12 @@ class MisEventHandler:
                 session.add(row)
                 await session.flush()
         except IntegrityError:
-            if await session.scalar(select(MisEvent).where(MisEvent.event_id == event_id)):
-                return {"duplicate": True, "event_id": event_id}
-            raise
+            raced = await session.scalar(select(MisEvent).where(MisEvent.event_id == event_id))
+            if raced is None:
+                raise
+            if not self._same_delivery(raced, event):
+                raise MisEventConflictError(event_id) from None
+            return {"duplicate": True, "event_id": event_id}
         # Сериализуем изменения клинических сущностей между разными событиями.
         # Блокировка PostgreSQL освобождается при завершении транзакции.
         await session.execute(text("SELECT pg_advisory_xact_lock(74120326)"))
